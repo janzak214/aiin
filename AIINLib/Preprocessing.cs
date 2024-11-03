@@ -1,11 +1,9 @@
-﻿using Geo;
+﻿using AIINInterfaces;
+using Geo;
 using OsmSharp;
+using Node = AIINInterfaces.Node;
 
 namespace AIINLib;
-
-public record Node(long Id, Coordinate Position);
-
-public record Road(long Id, long[] Nodes);
 
 public static class Preprocessing
 {
