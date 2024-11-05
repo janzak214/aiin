@@ -33,8 +33,9 @@ public static class Preprocessing
                         roadNodes.Add(node);
                     break;
 
-                case Way { Id: { } id, Nodes: { } nodes }:
-                    var road = new Road(id, nodes);
+                case Way { Id: { } id, Nodes: { } nodes, Tags: var tags }:
+                    var isOneWay = tags?.Contains("oneway", "yes") ?? false;
+                    var road = new Road(id, nodes, isOneWay);
                     roads.Add(road);
                     break;
             }

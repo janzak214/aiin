@@ -47,16 +47,25 @@ internal static class Program
             $"""
              [timeout:25][bbox:{bbox}];
 
-             nwr[amenity=parcel_locker][operator=InPost];
-             out ids tags center;
+             node
+                [amenity=parcel_locker]
+                [operator=InPost]
+                ->.parcel_lockers;
 
-             way[highway~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|road|residential|track|service|living_street)$"];
-             (way._[!access]; way._[access=yes];);
-             (way._[!vehicle]; way._[vehicle=yes];);
-             (way._[!motor_vehicle]; way._[motor_vehicle=yes];);
-             (way._[!motor_car]; way._[motor_car=yes];);
-             (way._; >;);
-             out skel;
+             way
+                [highway~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|road|residential|track|service|living_street)$"]
+                (if: 
+                    (!is_tag("access") || t["access"] == "yes")
+                    && (!is_tag("vehicle") || t["vehicle"] == "yes")
+                    && (!is_tag("motor_vehicle") || t["motor_vehicle"] == "yes")
+                    && (!is_tag("motor_car") || t["motor_car"] == "yes")
+                )
+                ->.roads;
+
+             .roads > ->.road_nodes;
+
+             (.parcel_lockers; .roads; .road_nodes;);
+             out body qt;
              """);
 
         await using var file = fileInfo.Open(FileMode.Create, FileAccess.ReadWrite);
@@ -78,7 +87,9 @@ internal static class Program
 
         Console.WriteLine($"parcel lockers: {parcelLockers.Count}");
         Console.WriteLine($"road nodes: {roadNodes.Count}");
-        Console.WriteLine($"roads: {roads.Count}");
+        var oneWayCount = roads.Count(x => x.OneWay);
+        Console.WriteLine($"two-way roads: {roads.Count - oneWayCount}");
+        Console.WriteLine($"one-way roads: {oneWayCount}");
         Console.WriteLine();
         Console.WriteLine("closest node for each parcel locker:");
 
