@@ -1,5 +1,9 @@
 ﻿namespace AIINInterfaces;
 
-public class GraphNode(List<(Node, float)> connectedNodes)
+public record GraphNode(List<(Node, float)> ConnectedNodes)
+{
+}
+
+public record ParcelLockerGraphNode(List<(Node, float)> ConnectedNodes) : GraphNode(ConnectedNodes)
 {
 }
