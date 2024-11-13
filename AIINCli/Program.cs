@@ -1,7 +1,13 @@
 ﻿using System.CommandLine;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using AIINInterfaces;
 using AIINLib;
-using Geo;
-using Geo.Geodesy;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using OsmSharp.Streams;
 
 namespace AIINCli;
@@ -12,36 +18,69 @@ internal static class Program
 
     private static async Task<int> Main(string[] args)
     {
-        var rootCommand = new RootCommand("AIIN CLI");
+        var rootCommand = new RootCommand(
+            """
+            AIIN CLI
+
+            Example usage:
+            $ AIINCli fetch data.osm
+            $ AIINCli analyze data.osm data.json.gz
+            $ AIINCli optimize data.json.gz data-opt.json.gz
+            $ AIINCli visualize data-opt.json.gz --original data.json.gz
+            """);
+
         var bboxOption = new Option<string>(
             name: "--bbox",
             description: "Bounding box",
             getDefaultValue: () => "49.98,19.84,50.12,20.03"
         );
 
-        var fileArgument = new Argument<FileInfo>("file", "Output file");
+        var outputFileArgument = new Argument<FileInfo>("outputFile", "Output file");
+        var inputFileArgument = new Argument<FileInfo>("inputFile", "Input file");
+
         var fetchDataCommand = new Command("fetch", "Fetch data from Overpass API for the given bounding box")
         {
             bboxOption,
-            fileArgument
+            outputFileArgument
         };
 
-        var inputFileArgument = new Argument<FileInfo>("file", "Input file");
-        var analyzeCommand = new Command("analyze", "Analyze the downloaded data")
+        var analyzeCommand = new Command("analyze", "Build the road graph")
         {
-            inputFileArgument
+            inputFileArgument,
+            outputFileArgument
         };
 
-        fetchDataCommand.SetHandler(FetchData, bboxOption, fileArgument);
-        analyzeCommand.SetHandler(Analyze, inputFileArgument);
+        var optimizeCommand = new Command("optimize", "Optimize the road graph")
+        {
+            inputFileArgument,
+            outputFileArgument
+        };
+
+        var originalOption = new Option<FileInfo?>(
+            name: "--original",
+            description: "Show the original graph for comparison"
+        );
+        var visualizeCommand = new Command("visualize", "Visualize graphs on a map")
+        {
+            inputFileArgument,
+            originalOption
+        };
+
+        fetchDataCommand.SetHandler(FetchData, bboxOption, outputFileArgument);
+        analyzeCommand.SetHandler(Analyze, inputFileArgument, outputFileArgument);
+        optimizeCommand.SetHandler(Optimize, inputFileArgument, outputFileArgument);
+        visualizeCommand.SetHandler(Visualize, inputFileArgument, originalOption);
         rootCommand.AddCommand(fetchDataCommand);
         rootCommand.AddCommand(analyzeCommand);
+        rootCommand.AddCommand(optimizeCommand);
+        rootCommand.AddCommand(visualizeCommand);
 
         return await rootCommand.InvokeAsync(args);
     }
 
     private static async Task FetchData(string bbox, FileInfo fileInfo)
     {
+        Console.WriteLine($"Downloading data for bounding box {bbox}");
         var client = new OverpassClient(OverpassUrl);
         using var response = await client.Fetch(
             $"""
@@ -54,12 +93,12 @@ internal static class Program
 
              way
                 [highway~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|road|residential|track|service|living_street)$"]
-                (if: 
-                    (!is_tag("access") || t["access"] == "yes")
-                    && (!is_tag("vehicle") || t["vehicle"] == "yes")
-                    && (!is_tag("motor_vehicle") || t["motor_vehicle"] == "yes")
-                    && (!is_tag("motor_car") || t["motor_car"] == "yes")
-                )
+                [access != no]
+                [vehicle != no]
+                [motor_vehicle != no]
+                [motor_car != no]
+                [area != yes]
+                [service != emergency_access]
                 ->.roads;
 
              .roads > ->.road_nodes;
@@ -79,8 +118,11 @@ internal static class Program
         Console.WriteLine("Fetched data successfully");
     }
 
-    private static void Analyze(FileInfo fileInfo)
+    private static void Analyze(FileInfo fileInfo, FileInfo outFileInfo)
     {
+        var roadGraphBuilder = new RoadGraphBuilder();
+        var serializer = new GraphSerializer();
+
         using var file = fileInfo.OpenRead();
         var source = new XmlOsmStreamSource(file);
         var (parcelLockers, roadNodes, roads) = Preprocessing.SplitByType(source);
@@ -90,33 +132,101 @@ internal static class Program
         var oneWayCount = roads.Count(x => x.OneWay);
         Console.WriteLine($"two-way roads: {roads.Count - oneWayCount}");
         Console.WriteLine($"one-way roads: {oneWayCount}");
-        Console.WriteLine();
-        Console.WriteLine("closest node for each parcel locker:");
+        
+        var graph = roadGraphBuilder.CreateRoadGraph(roads, roadNodes, parcelLockers);
 
-        var watch = System.Diagnostics.Stopwatch.StartNew();
-        var calculator = new SpheroidCalculator();
-        var closest = parcelLockers
-            .AsParallel()
-            .Select(item =>
-            {
-                var (node, distance) = roadNodes
-                    .Select(x => (
-                        Node: x,
-                        Distance: calculator.CalculateLength(
-                            new CoordinateSequence([item.Position, x.Position])
-                        )
-                    ))
-                    .MinBy(x => x.Distance);
+        using var stream = outFileInfo.Create();
+        serializer.Serialize(stream, graph);
+    }
 
-                return (item, node, distance);
-            }).ToList();
-        watch.Stop();
 
-        foreach (var x in closest)
+    private static void Optimize(FileInfo inFile, FileInfo outFile)
+    {
+        var roadGraphBuilder = new RoadGraphBuilder();
+        var serializer = new GraphSerializer();
+
+        using var stream = inFile.OpenRead();
+        using var outStream = outFile.OpenWrite();
+
+        var graph = serializer.Deserialize(stream);
+        var optimized = roadGraphBuilder.OptimizeRoadGraph(graph);
+
+        var parcelLockers = graph.Count(x => x is ParcelLockerGraphNode);
+        var parcelLockersOpt = optimized.Count(x => x is ParcelLockerGraphNode);
+        Console.WriteLine($"parcel lockers: {parcelLockers} => {parcelLockersOpt}");
+        Console.WriteLine($"road nodes: {graph.Count - parcelLockers} => {optimized.Count - parcelLockersOpt}");
+
+        serializer.Serialize(outStream, optimized);
+    }
+
+    private static void Visualize(FileInfo fileInfo, FileInfo? original)
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.Logging.ClearProviders();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        var app = builder.Build();
+        app.MapGet("/graph.json", async (context) =>
         {
-            Console.WriteLine(x);
+            context.Response.Headers.ContentEncoding = "gzip";
+            await Results.File(
+                fileInfo.OpenRead(), contentType: "application/json"
+            ).ExecuteAsync(context);
+        });
+        app.MapGet("/original.json", async (context) =>
+        {
+            if (original is { } file)
+            {
+                context.Response.Headers.ContentEncoding = "gzip";
+                await Results.File(
+                    file.OpenRead(), contentType: "application/json"
+                ).ExecuteAsync(context);
+            }
+            else
+            {
+                await Results.NotFound().ExecuteAsync(context);
+            }
+        });
+        app.MapGet("/",
+            () => Results.File(
+                Path.Join(AppDomain.CurrentDomain.BaseDirectory, "visualization.html"),
+                contentType: "text/html"
+            )
+        );
+        app.MapGet("/style.json",
+            () => Results.File(
+                Path.Join(AppDomain.CurrentDomain.BaseDirectory, "style.json"),
+                contentType: "application/json"
+            )
+        );
+        app.Start();
+        var url = app.Urls.First();
+        Console.WriteLine($"Listening on {app.Urls.First()}");
+        OpenBrowser(url);
+        app.WaitForShutdown();
+    }
+
+    private static void OpenBrowser(string url)
+    {
+        ProcessStartInfo processStartInfo;
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            processStartInfo = new ProcessStartInfo(url) { UseShellExecute = true };
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            processStartInfo = new ProcessStartInfo("xdg-open", url);
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            processStartInfo = new ProcessStartInfo("open", url);
+        }
+        else
+        {
+            Console.WriteLine("Unable to open browser: platform not supported");
+            return;
         }
 
-        Console.WriteLine($"took {watch.ElapsedMilliseconds / 1000}s");
+        Process.Start(processStartInfo);
     }
 }

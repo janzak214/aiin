@@ -1,0 +1,81 @@
+{
+  "version": 8,
+  "name": "Dark Matter without labels",
+  "metadata": {
+    "maputnik:renderer": "mbgljs"
+  },
+  "sources": {
+    "carto": {
+      "type": "vector",
+      "url": "https://tiles.basemaps.cartocdn.com/vector/carto.streets/v1/tiles.json"
+    }
+  },
+  "sprite": "https://tiles.basemaps.cartocdn.com/gl/dark-matter-gl-style/sprite",
+  "glyphs": "https://tiles.basemaps.cartocdn.com/fonts/{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "layout": {
+        "visibility": "visible"
+      },
+      "paint": {
+        "background-color": "#0e0e0e",
+        "background-opacity": 1
+      }
+    },
+    {
+      "id": "landcover",
+      "type": "fill",
+      "source": "carto",
+      "source-layer": "landcover",
+      "filter": [
+        "any",
+        [
+          "==",
+          "class",
+          "wood"
+        ],
+        [
+          "==",
+          "class",
+          "grass"
+        ],
+        [
+          "==",
+          "subclass",
+          "recreation_ground"
+        ]
+      ],
+      "paint": {
+        "fill-color": {
+          "stops": [
+            [
+              8,
+              "#0e0e0e"
+            ],
+            [
+              9,
+              "#0e0e0e"
+            ],
+            [
+              11,
+              "#0e0e0e"
+            ],
+            [
+              13,
+              "#0e0e0e"
+            ],
+            [
+              15,
+              "#0e0e0e"
+            ]
+          ]
+        },
+        "fill-opacity": 1
+      }
+    }
+  ],
+  "id": "voyager",
+  "owner": "Carto"
+}

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Visualization</title>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"/>
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <script src="https://unpkg.com/deck.gl@9.0.35/dist.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body,
+        #map {
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+    const {MapboxOverlay, ScatterplotLayer, LineLayer} = deck;
+
+    const map = new maplibregl.Map({
+        container: "map",
+        style: 'https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json',
+        center: [19.93, 50.05],
+        zoom: 11,
+        antialias: true
+    });
+
+    map.addControl(new maplibregl.NavigationControl());
+
+    function processData(data) {
+        const parcelLockers = Object.entries(data).filter(x => x[1].parcelLockerId != null);
+        const roads = [];
+        for ([id, node] of Object.entries(data)) {
+            for ([childId, weight] of Object.entries(node.connections)) {
+                if (childId in data)
+                    roads.push([[data[id].longitude, data[id].latitude], [data[childId].longitude, data[childId].latitude]])
+            }
+        }
+        return {parcelLockers, roads, nodes: data};
+    }
+
+
+    (async () => {
+        const [graph, original] = await Promise.all([
+            fetch("graph.json").then(x => x.json()),
+            fetch("original.json").then(x => x.json()).catch(() => null)
+        ]);
+
+        const data = processData(graph);
+        const originalData = original == null ? null : processData(original);
+        if (deckOverlay) update(data, originalData);
+        window.data = data;
+        window.originalData = originalData;
+        window.filterNodes = x => update(data, originalData, x);
+    })();
+
+    let deckOverlay
+
+    map.on('style.load', () => {
+        deckOverlay = new MapboxOverlay({
+            interleaved: true,
+        });
+
+        map.addControl(deckOverlay);
+    });
+
+    function update(data, originalData, ids = []) {
+        console.log("updating");
+        const filtered = [];
+        let bbox = [[Infinity, Infinity], [-Infinity, -Infinity]]
+        for (const node of Object.values(data.nodes)) {
+            bbox[0][0] = Math.min(bbox[0][0], node.longitude);
+            bbox[0][1] = Math.min(bbox[0][1], node.latitude);
+            bbox[1][0] = Math.max(bbox[1][0], node.longitude);
+            bbox[1][1] = Math.max(bbox[1][1], node.latitude);
+        }
+        for (const id of ids) {
+            const node = data.nodes[id];
+            filtered.push(node);
+        }
+        console.log("bbox", bbox);
+        map.fitBounds(bbox, {
+            padding: {top: 50, bottom: 50, left: 50, right: 50}
+        });
+        console.log(filtered);
+        deckOverlay.setProps({
+            layers: [
+                new LineLayer({
+                    id: 'original-roads',
+                    data: originalData?.roads,
+                    getColor: [24, 80, 132],
+                    getSourcePosition: d => d[0],
+                    getTargetPosition: d => d[1],
+                    getWidth: 4,
+                    widthUnits: 'meters',
+                    widthMinPixels: 1,
+                    opacity: 0.3,
+                }),
+                new LineLayer({
+                    id: 'roads',
+                    data: data.roads,
+                    getColor: [171, 24, 74],
+                    getSourcePosition: d => d[0],
+                    getTargetPosition: d => d[1],
+                    getWidth: 6,
+                    widthUnits: 'meters',
+                    widthMinPixels: 1,
+                    opacity: 1,
+                }),
+                new ScatterplotLayer({
+                    id: 'parcel-lockers',
+                    data: data.parcelLockers,
+                    getPosition: d => [d[1].longitude, d[1].latitude],
+                    opacity: 0.2,
+                    filled: true,
+                    radiusScale: 1,
+                    getRadius: 20,
+                    radiusUnits: 'meters',
+                    radiusMinPixels: 2,
+                    getFillColor: [239, 188, 138],
+                }),
+                new ScatterplotLayer({
+                    id: 'nodes',
+                    data: filtered,
+                    getPosition: d => [d.longitude, d.latitude],
+                    opacity: 1,
+                    filled: true,
+                    radiusScale: 1,
+                    getRadius: 8,
+                    radiusUnits: 'pixels',
+                    lineWidthUnits: 'pixels',
+                    getFillColor: [255, 128, 255],
+                    getLineColor: [0, 0, 0],
+                    stroked: true,
+                    getLineWidth: 2,
+                }),
+                new ScatterplotLayer({
+                    id: 'parcel-locker-sources',
+                    data: data.parcelLockers,
+                    getPosition: d => [d[1].parcelLockerLongitude, d[1].parcelLockerLatitude],
+                    opacity: 1,
+                    filled: true,
+                    radiusScale: 1,
+                    getRadius: 3,
+                    radiusUnits: 'meters',
+                    radiusMinPixels: 2,
+                    getFillColor: [239, 188, 138],
+                }),
+            ]
+        });
+    }
+</script>
+</body>
+</html>
