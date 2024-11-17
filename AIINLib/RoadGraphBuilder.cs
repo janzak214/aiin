@@ -103,7 +103,7 @@ public class RoadGraphBuilder : IRoadGraphBuilder
             var newGraph = OptimizeRoadGraphStep(graph);
             if (newGraph.Count == graph.Count)
             {
-                return newGraph;
+                return RemoveSpuriousConnections(newGraph);
             }
 
             graph = newGraph;
@@ -261,5 +261,17 @@ public class RoadGraphBuilder : IRoadGraphBuilder
         }
 
         return result;
+    }
+
+    private static List<GraphNode> RemoveSpuriousConnections(List<GraphNode> roadGraph)
+    {
+        var graph = roadGraph.Select(x => x.Id).ToHashSet();
+
+        foreach (var node in roadGraph)
+        {
+            node.ConnectedNodes.RemoveAll(x => !graph.Contains(x.node.Id));
+        }
+
+        return roadGraph;
     }
 }
