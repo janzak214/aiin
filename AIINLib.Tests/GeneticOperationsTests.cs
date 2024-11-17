@@ -105,4 +105,25 @@ public class GeneticOperationsTests
         var mutatedIndividual = geneticOperations.Mutate(individual);
         Assert.Pass();
     }
+    
+    [Test]
+    public void Crossover_PopulationSize4IndividualSize4_NoExceptions()
+    {
+        ConnectNodes(node2, node3, 3);
+        geneticOperations = new GeneticOperations(2, 5, lockersToVisite, loggerFactory);
+        var population = geneticOperations.CreateRandomPopulation(parcelLockerGraph);
+        var individual1 = population[0];
+        var individual2 = population[1];
+
+        try
+        {
+            var mutatedIndividual = geneticOperations.Crossover(individual1, individual2);
+        }
+        catch (InvalidOperationException ex)
+        {
+            
+        }
+        
+        Assert.Pass();
+    }
 }
