@@ -27,6 +27,8 @@ internal static class Program
             $ AIINCli analyze data.osm data.json.gz
             $ AIINCli optimize data.json.gz data-opt.json.gz
             $ AIINCli visualize data-opt.json.gz --original data.json.gz
+            $ AIINCli create-parcel-graph data-opt.json.gz parcel-graph.json.gz
+            $ AIINCli visualize parcel-graph.json.gz --original data.json.gz
             """);
 
         var bboxOption = new Option<string>(
@@ -56,6 +58,12 @@ internal static class Program
             outputFileArgument
         };
 
+        var createParcelGraphCommand = new Command("create-parcel-graph", "Create the parcel graph")
+        {
+            inputFileArgument,
+            outputFileArgument
+        };
+
         var originalOption = new Option<FileInfo?>(
             name: "--original",
             description: "Show the original graph for comparison"
@@ -69,10 +77,12 @@ internal static class Program
         fetchDataCommand.SetHandler(FetchData, bboxOption, outputFileArgument);
         analyzeCommand.SetHandler(Analyze, inputFileArgument, outputFileArgument);
         optimizeCommand.SetHandler(Optimize, inputFileArgument, outputFileArgument);
+        createParcelGraphCommand.SetHandler(CreateParcelGraph, inputFileArgument, outputFileArgument);
         visualizeCommand.SetHandler(Visualize, inputFileArgument, originalOption);
         rootCommand.AddCommand(fetchDataCommand);
         rootCommand.AddCommand(analyzeCommand);
         rootCommand.AddCommand(optimizeCommand);
+        rootCommand.AddCommand(createParcelGraphCommand);
         rootCommand.AddCommand(visualizeCommand);
 
         return await rootCommand.InvokeAsync(args);
@@ -157,6 +167,31 @@ internal static class Program
         Console.WriteLine($"road nodes: {graph.Count - parcelLockers} => {optimized.Count - parcelLockersOpt}");
 
         serializer.Serialize(outStream, optimized);
+    }
+
+    private static void CreateParcelGraph(FileInfo inFile, FileInfo outFile)
+    {
+        var parcelLockerGraphBuilder = new ParcelLockerGraphBuilder();
+        var serializer = new GraphSerializer();
+
+        using var stream = inFile.OpenRead();
+        using var outStream = outFile.OpenWrite();
+
+        var graph = serializer.Deserialize(stream);
+        var parcelGraph = parcelLockerGraphBuilder.CreateParcelLockerGraph(graph);
+
+        var parcelLockers = parcelGraph.Count();
+        Console.WriteLine($"parcel lockers: {parcelLockers}");
+        foreach (var node in parcelGraph)
+        {
+            if (node.ConnectedNodes.Count != parcelLockers)
+            {
+                Console.WriteLine($"warning: parcel locker {node.Id} has {node.ConnectedNodes.Count} connections");
+            }
+        }
+
+
+        serializer.Serialize(outStream, parcelGraph.Cast<GraphNode>().ToList());
     }
 
     private static void Visualize(FileInfo fileInfo, FileInfo? original)
