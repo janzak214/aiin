@@ -57,23 +57,38 @@ public class GeneticOperations: IGeneticOperations
         }
     }
 
+
+/// <summary>
+/// Utilizes two-opt as mutation method. Mutates the individual.
+/// </summary>
+/// <param name="individual">Order of parcel lockers to visit</param>
+/// <returns>
+/// Mutated order of parcel lockers to visit.
+/// </returns>
     public List<GraphNode> Mutate(List<GraphNode> individual)
     {
         _logger.LogInformation("\n------Mutating started------\n");
         _logger.LogInformation("Individual before mutation: {0}", string.Join(", ", individual));
         
-        int nodeNumberFromWhichMutate = _random.Next(1,individual.Count-1);
-        List<GraphNode> individualToMutate = individual.Take(nodeNumberFromWhichMutate).ToList();
         
-        int individualsVisitedAllLockers = 0;
-        int individualsMissedLockers = 0;
+        var mutationCandidat = individual.Select(node => node).ToList();
         
-        var mutatedIndividual = growGraph(individualToMutate, ref individualsVisitedAllLockers, ref individualsMissedLockers);
-        _logger.LogInformation("Individual after mutation: {0}", string.Join(", ", mutatedIndividual));
+        int firstRandomNodeIndex = _random.Next(mutationCandidat.Count());
+        int secondRandomNodeIndex;
         
+        do
+        {
+            secondRandomNodeIndex = _random.Next(mutationCandidat.Count());
+        } 
+        while(secondRandomNodeIndex != firstRandomNodeIndex);
+        
+        mutationCandidat.ExtensionReverse(firstRandomNodeIndex, secondRandomNodeIndex);
+        
+        
+        _logger.LogInformation("Individual after mutation: {0}", string.Join(", ", mutationCandidat));
         _logger.LogInformation("\n------Individual mutated------\n");
-
-        return mutatedIndividual;
+        
+        return mutationCandidat;
     }
 
     public (List<GraphNode> childA, List<GraphNode> childB) Crossover(List<GraphNode> individualA, List<GraphNode> individualB)
