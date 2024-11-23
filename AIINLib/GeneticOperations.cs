@@ -6,94 +6,55 @@ namespace AIINLib;
 public class GeneticOperations: IGeneticOperations
 {
     private int _populationSize;
-    private int _maxIndividualSize;
     private Random _random;
     private readonly ILogger _logger;
-    private HashSet<GraphNode> _lockersToVisit;
 
-    public GeneticOperations(int populationSize, int maxIndividualSize, HashSet<GraphNode> lockersToVisit, ILoggerFactory loggerFactory)
+    public GeneticOperations(int populationSize, ILoggerFactory loggerFactory)
     {
         _populationSize = populationSize;
-        _maxIndividualSize = maxIndividualSize;
         _random = new Random();
         _logger = loggerFactory.CreateLogger("GeneticOperations");
-        _lockersToVisit = lockersToVisit;
     }
     
-public List<List<GraphNode>> CreateRandomPopulation(
-    List<GraphNode> parcelLockerGraph)
-{
-    _logger.LogInformation("\n------Creation of random population started------\n");
-    
-    int individualsVisitedAllLockers = 0;
-    int individualsMissedLockers = 0;
-
-    List<List<GraphNode>> population = new();
-    
-
-    for (int i = 0; i < _populationSize; i++)
+    public List<List<GraphNode>> CreateRandomPopulation(
+        List<GraphNode> parcelLockerGraph)
     {
-        int startNodeIndex = _random.Next(parcelLockerGraph.Count);
-        List<GraphNode> individual = new() { parcelLockerGraph[startNodeIndex] };
+        _logger.LogInformation("\n------Creation of random population started------\n");
+
+        List<List<GraphNode>> population = new();
         
-        individual = growGraph(individual, ref individualsVisitedAllLockers, ref individualsMissedLockers);
 
-        population.Add(individual);
-    }
-
-    _logger.LogInformation("\n------Random population creation completed------\n");
-    return population;
-    }
-
-    private List<GraphNode> growGraph(List<GraphNode> individual, ref int individualsVisitedAllLockers, ref int individualsMissedLockers)
-    {
-        GraphNode? lastVisitedNode = null;
-        
-        if (individual.Count() > 1)
+        for (int i = 0; i < _populationSize; i++)
         {
-            lastVisitedNode = individual[individual.Count - 2];
-        }
-        
-        for (int j = individual.Count(); j < _maxIndividualSize; j++)
-        {
-            GraphNode currentNode = individual.Last();
-            List<GraphNode> connectedNodes = 
-                currentNode.ConnectedNodes.Select(edge => edge.Item1).ToList();
-
-            // Remove the last visited node to avoid immediately revisiting
-            List<GraphNode> validChoices = connectedNodes
-                .Where(node => node != lastVisitedNode)
-                .ToList();
-
-            if (validChoices.Count == 0)
-            {
-                validChoices.Add(lastVisitedNode);
-            }
-
-            int nextNodeIndex = _random.Next(validChoices.Count);
-            individual.Add(validChoices[nextNodeIndex]);
+            List<GraphNode> individual = new();
             
-            lastVisitedNode = currentNode;
+            GrowGraph(individual, parcelLockerGraph);
 
-            // Check if all lockers are visited
-            if (_lockersToVisit.IsSubsetOf(individual))
-            {
-                individualsVisitedAllLockers++;
-                _logger.LogInformation(
-                    $"Created new individual that visited all lockers. Total: {individualsVisitedAllLockers}");
-                break;
-            }
+            population.Add(individual);
+            _logger.LogInformation("New individual added to population: {0}", string.Join(", ", individual.Select(node => node.Id)));
         }
 
-        // Log if the individual did not visit all lockers
-        if (individual.Count == _maxIndividualSize && !_lockersToVisit.IsSubsetOf(individual))
+        _logger.LogInformation("\n------Random population creation completed------\n");
+        
+        return population;
+    }
+
+    private void GrowGraph(List<GraphNode> individual, List<GraphNode> parcelLockerGraph)
+    {
+        if (individual == null)
         {
-            individualsMissedLockers++;
-            _logger.LogInformation(
-                $"Created new individual that did not visit all lockers. Total: {individualsMissedLockers}");
+            throw new ArgumentNullException(nameof(individual));
         }
-
-        return individual;
+        
+        var nodesToVisit =
+            parcelLockerGraph.Where(node => !individual.Select(individualNode => individualNode.Id).Contains(node.Id)).ToList();
+        
+        while (nodesToVisit.Count() != 0)
+        {
+            var randomNodeIndex = _random.Next(nodesToVisit.Count);
+            individual.Add(nodesToVisit[randomNodeIndex]);
+            nodesToVisit.RemoveAt(randomNodeIndex);
+        }
     }
 
     public List<GraphNode> Mutate(List<GraphNode> individual)
