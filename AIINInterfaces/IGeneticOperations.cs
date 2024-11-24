@@ -9,6 +9,5 @@ public interface IGeneticOperations
 
     List<GraphNode> Mutate(List<GraphNode> individual);
 
-    (List<GraphNode> childA, List<GraphNode> childB)
-        Crossover(List<GraphNode> individualA, List<GraphNode> individualB);
+    List<GraphNode> Crossover(List<GraphNode> individualA, List<GraphNode> individualB);
 }

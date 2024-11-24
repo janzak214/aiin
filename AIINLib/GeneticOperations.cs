@@ -74,8 +74,18 @@ public class GeneticOperations: IGeneticOperations
     /// </returns>
     public List<GraphNode> Mutate(List<GraphNode> individual)
     {
+        if (individual == null)
+        {
+            throw new ArgumentNullException(nameof(individual));
+        }
+
+        if (individual.Count <=1)
+        {
+            throw new ArgumentException("Argument count must be higher than 1.");
+        }
+        
         _logger.LogInformation("\n------Mutating started------\n");
-        _logger.LogInformation("Individual before mutation: {0}", string.Join(", ", individual));
+        _logger.LogInformation("Individual before mutation: {0}", string.Join(", ", individual.Select(node=>node.Id)));
         
         
         var mutationCandidat = individual.Select(node => node).ToList();
@@ -87,12 +97,12 @@ public class GeneticOperations: IGeneticOperations
         {
             secondRandomNodeIndex = _random.Next(mutationCandidat.Count());
         } 
-        while(secondRandomNodeIndex != firstRandomNodeIndex);
+        while(secondRandomNodeIndex == firstRandomNodeIndex);
         
         mutationCandidat.ExtensionReverse(firstRandomNodeIndex, secondRandomNodeIndex);
         
         
-        _logger.LogInformation("Individual after mutation: {0}", string.Join(", ", mutationCandidat));
+        _logger.LogInformation("Individual after mutation: {0}", string.Join(", ", mutationCandidat.Select(node=>node.Id)));
         _logger.LogInformation("\n------Individual mutated------\n");
         
         return mutationCandidat;
@@ -108,6 +118,11 @@ public class GeneticOperations: IGeneticOperations
     /// <returns>A new individual (list of GraphNodes) created through crossover.</returns>
     public List<GraphNode> Crossover(List<GraphNode> individualA, List<GraphNode> individualB)
     {
+        if (individualA == null || individualB == null)
+        {
+            throw new ArgumentNullException();
+        }
+        
         _logger.LogInformation("\n------ Crossover started ------\n");
         _logger.LogInformation("Parent A: {0}", string.Join(", ", individualA.Select(node => node.Id)));
         _logger.LogInformation("Parent B: {0}", string.Join(", ", individualB.Select(node => node.Id)));
@@ -118,14 +133,14 @@ public class GeneticOperations: IGeneticOperations
 
         foreach (var node in individualB)
         {
-            if (!successor.Contains(node))
+            if (!successor.Select(x=> x.Id).Contains(node.Id))
             {
                 successor.Add(node);
             }
         }
 
-        _logger.LogInformation("\n------ Crossover finished ------\n");
         _logger.LogInformation("Successor: {0}", string.Join(", ", successor.Select(node => node.Id)));
+        _logger.LogInformation("\n------ Crossover finished ------\n");
 
         return successor;
     }
