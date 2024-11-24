@@ -7,123 +7,116 @@ namespace AIINLib.Test;
 [TestFixture]
 public class GeneticOperationsTests
 {
-    private void ConnectNodes(GraphNode node1, GraphNode node2, double distance)
-    {
-        node1.ConnectedNodes.Add((node2, distance));
-        node2.ConnectedNodes.Add((node1, distance));
-    }
-
-    private readonly RoadGraphBuilder _builder = new RoadGraphBuilder();
-
     private static GraphNode MakeNode(long id, double latitude, double longitude, bool isParcelLocker = false) =>
         isParcelLocker
             ? new ParcelLockerGraphNode(id, [], new Coordinate(latitude, longitude), 100 + id,
                 new Coordinate(latitude, longitude))
             : new GraphNode(id, [], new Coordinate(latitude, longitude));
     
-    
-
-    private ILoggerFactory loggerFactory;
-    private GeneticOperations geneticOperations;
-    private List<GraphNode> parcelLockerGraph;
-    private HashSet<GraphNode> lockersToVisite;
-
-    private GraphNode node1;
-    private GraphNode node2;
-    private GraphNode node3;
-    private GraphNode node4;
-    private GraphNode node5;
-
+    private GeneticOperations _geneticOperations;
+    private ILoggerFactory _LoggerFactory;
+    private List<GraphNode> nodes;
     [SetUp]
     public void SetUp()
     {
-        loggerFactory = LoggerFactory.Create(build => build.AddConsole());
-        
-        
-        node1 = MakeNode(1, 0, 0, isParcelLocker: true);
-        node2 = MakeNode(2, 1, 0);
-        node3 = MakeNode(3, 2, 0);
-        node4 = MakeNode(4, 3, 0, isParcelLocker: true);
-        node5 = MakeNode(5, 4, 0);
-        ConnectNodes(node1, node2, 1);
-        ConnectNodes(node2, node3, 1);
-        ConnectNodes(node3, node4, 1);
-        ConnectNodes(node4, node5, 1);
-        
-        parcelLockerGraph = new List<GraphNode>([node1, node2, node3, node4]);
-        lockersToVisite = new HashSet<GraphNode>([node1, node2, node3]);
+        _LoggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
+
+        _geneticOperations = new GeneticOperations(5, _LoggerFactory);
     }
 
     [Test]
-    public void CreateRandomPopulation_PopulationSize3_True()
+    public void CreateRandomPopulation_ShouldGeneratePopulationOfCorrectSize()
     {
-        geneticOperations = new GeneticOperations(3, 3, lockersToVisite, loggerFactory);
-        var pupulation = geneticOperations.CreateRandomPopulation(parcelLockerGraph);
-        
-        Assert.That(pupulation.Count, Is.EqualTo(3));
-        foreach (List<GraphNode> individual in pupulation)
+        // Arrange
+        var nodes = new List<GraphNode>
         {
-            Assert.That(individual, Is.Not.Null);
-            Assert.That(individual.Count, Is.LessThanOrEqualTo(3));
-        }
-    }
-    
-    [Test]
-    public void CreateRandomPopulation_populationSize3IndividualsSize3_True()
-    {
-        geneticOperations = new GeneticOperations(3, 3,lockersToVisite, loggerFactory);
-        var population = geneticOperations.CreateRandomPopulation(parcelLockerGraph);
-        
-        foreach (List<GraphNode> individual in population)
-        {
-            Assert.That(individual, Is.Not.Null);
-            Assert.That(individual.Count, Is.LessThanOrEqualTo(3));
-        }
-    }
-    
-    [Test]
-    public void CreateRandomPopulation_PopulationSize4IndividualSize4_NoIndividualsThatComeBackToLatestNodeIfNotInAtTheEndOfTheRode()
-    {
-        geneticOperations = new GeneticOperations(4, 4,lockersToVisite, loggerFactory);
-        var pupulation = geneticOperations.CreateRandomPopulation(parcelLockerGraph);
-        
-        foreach (List<GraphNode> individual in pupulation)
-        {
-            Assert.That(individual, Has.Member(node3));
-        }
-    }
-    
-    
-    [Test]
-    public void Mutate_PopulationSize4IndividualSize4_NoExceptions()
-    {
-        ConnectNodes(node2, node3, 3);
-        geneticOperations = new GeneticOperations(1, 5, lockersToVisite, loggerFactory);
-        var population = geneticOperations.CreateRandomPopulation(parcelLockerGraph);
-        var individual = population[0];
-        
-        var mutatedIndividual = geneticOperations.Mutate(individual);
-        Assert.Pass();
-    }
-    
-    [Test]
-    public void Crossover_PopulationSize4IndividualSize4_NoExceptions()
-    {
-        ConnectNodes(node2, node3, 3);
-        geneticOperations = new GeneticOperations(2, 5, lockersToVisite, loggerFactory);
-        var population = geneticOperations.CreateRandomPopulation(parcelLockerGraph);
-        var individual1 = population[0];
-        var individual2 = population[1];
+            MakeNode(1, 0, 0, isParcelLocker: true),
+            MakeNode(2, 1, 0),
+            MakeNode(3, 2, 0),
+            MakeNode(4, 3, 0, isParcelLocker: true)
+        };
 
-        try
+        // Act
+        var population = _geneticOperations.CreateRandomPopulation(nodes);
+
+        // Assert
+        Assert.AreEqual(5, population.Count, "Population size should match the specified size.");
+        Assert.IsTrue(population.All(individual => individual.Count == nodes.Count),
+            "Each individual should contain all nodes in the graph.");
+        Assert.IsTrue(population.All(individual => individual.Distinct().Count() == nodes.Count),
+            "Each individual should not have duplicate nodes.");
+    }
+
+    [Test]
+    public void Mutate_ShouldAlterIndividualButRetainNodes()
+    {
+        // Arrange
+        var individual = new List<GraphNode>
         {
-            var mutatedIndividual = geneticOperations.Crossover(individual1, individual2);
-        }
-        catch (InvalidOperationException ex)
+            MakeNode(1, 0, 0, isParcelLocker: true),
+            MakeNode(2, 1, 0),
+            MakeNode(3, 2, 0),
+            MakeNode(4, 3, 0, isParcelLocker: true)
+        };
+
+        // Act
+        var mutatedIndividual = _geneticOperations.Mutate(individual);
+
+        // Assert
+        Assert.AreEqual(individual.Count, mutatedIndividual.Count, "Mutated individual should have the same number of nodes.");
+        CollectionAssert.AreEquivalent(individual, mutatedIndividual,
+            "Mutated individual should contain the same nodes as the original.");
+        Assert.AreNotEqual(individual, mutatedIndividual, 
+            "Mutated individual should differ from the original.");
+    }
+
+    [Test]
+    public void Crossover_ShouldCombineParentsCorrectly()
+    {
+        // Arrange
+        var parentA = new List<GraphNode>
         {
-            
-        }
-        
-        Assert.Pass();
+            MakeNode(1, 0, 0, isParcelLocker: true),
+            MakeNode(2, 1, 0),
+            MakeNode(3, 2, 0),
+            MakeNode(4, 3, 0, isParcelLocker: true)
+        };
+        var parentB = new List<GraphNode>
+        {
+            MakeNode(4, 0, 0, isParcelLocker: true),
+            MakeNode(3, 1, 0),
+            MakeNode(2, 2, 0),
+            MakeNode(1, 3, 0, isParcelLocker: true)
+        };
+
+        // Act
+        var successor = _geneticOperations.Crossover(parentA, parentB);
+
+        // Assert
+        Assert.AreEqual(4, successor.Count, "Successor should include all unique nodes from both parents.");
+        CollectionAssert.AreEqual(new List<int> { 1, 2, 4, 3}, successor.Select(node => node.Id),
+            "Successor should contain Parent A's first half and Parent B's remaining nodes.");
+    }
+
+    [Test]
+    public void GrowGraph_ShouldBuildIndividualWithAllNodes()
+    {
+        // Arrange
+        var parcelLockerGraph = new List<GraphNode>
+        {
+            MakeNode(1, 0, 0, isParcelLocker: true),
+            MakeNode(2, 1, 0),
+            MakeNode(3, 2, 0),
+        };
+        var individual = new List<GraphNode>();
+
+        // Act
+        var method = typeof(GeneticOperations).GetMethod("GrowGraph", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        method.Invoke(_geneticOperations, new object[] { individual, parcelLockerGraph });
+
+        // Assert
+        Assert.AreEqual(parcelLockerGraph.Count, individual.Count, "Individual should include all nodes.");
+        CollectionAssert.AreEquivalent(parcelLockerGraph, individual,
+            "Individual should contain the same nodes as the parcel-locker graph.");
     }
 }
