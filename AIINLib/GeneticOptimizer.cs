@@ -24,7 +24,7 @@ public class GeneticOptimizer : IGeneticOptimizer
     {
         List<GraphNode>? fittestIndividual = null;
         double fittestFitness = double.MaxValue;
-        for (int i = 0; i < AppSettings.TournamentSize; i++)
+        for (int i = 0; i < AppConfig.GeneticAlgorithmSettings.TournamentSize; i++)
         {
             var individual = population[random.Next(0, population.Count)];
             var fitness = CalculateFitness(individual);
@@ -43,7 +43,7 @@ public class GeneticOptimizer : IGeneticOptimizer
     {
         int? worstIndividualIndex = null;
         double worstFitness = double.MinValue;
-        for (int i = 0; i < AppSettings.TournamentSize; i++)
+        for (int i = 0; i < AppConfig.GeneticAlgorithmSettings.TournamentSize; i++)
         {
             var individualIndex = random.Next(0, population.Count);
             var fitness = CalculateFitness(population[individualIndex]);
