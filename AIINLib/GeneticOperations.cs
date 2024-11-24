@@ -13,7 +13,7 @@ public class GeneticOperations: IGeneticOperations
     {
         _populationSize = populationSize;
         _random = new Random();
-        _logger = loggerFactory.CreateLogger("GeneticOperations");
+        _logger = loggerFactory.CreateLogger<GeneticOperations>();
     }
     
     /// <summary>
