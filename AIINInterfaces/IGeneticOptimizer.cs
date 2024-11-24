@@ -2,11 +2,11 @@
 
 public interface IGeneticOptimizer
 {
-    List<List<GraphNode>> Tournament(List<List<GraphNode>> population);
+    List<GraphNode> Tournament(List<List<GraphNode>> population);
 
-    List<List<GraphNode>> NegativeTournament(List<List<GraphNode>> population);
+    int NegativeTournament(List<List<GraphNode>> population);
 
-    float CalculateFitness(List<GraphNode> individual, Func<GraphNode, GraphNode, float> metric);
+    double CalculateFitness(List<GraphNode> individual);
 
     List<List<GraphNode>> Step(List<List<GraphNode>> population);
 }
