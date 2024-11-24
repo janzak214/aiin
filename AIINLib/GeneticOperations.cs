@@ -98,42 +98,36 @@ public class GeneticOperations: IGeneticOperations
         return mutationCandidat;
     }
 
-    public (List<GraphNode> childA, List<GraphNode> childB) Crossover(List<GraphNode> individualA, List<GraphNode> individualB)
+    /// <summary>
+    /// Performs a crossover between two individuals by taking the first half of the nodes
+    /// from the first parent and appending the remaining nodes from the second parent
+    /// in the order they appear, skipping duplicates.
+    /// </summary>
+    /// <param name="individualA">The first parent.</param>
+    /// <param name="individualB">The second parent.</param>
+    /// <returns>A new individual (list of GraphNodes) created through crossover.</returns>
+    public List<GraphNode> Crossover(List<GraphNode> individualA, List<GraphNode> individualB)
     {
-        _logger.LogInformation("\n------Crossover started------\n");
+        _logger.LogInformation("\n------ Crossover started ------\n");
         _logger.LogInformation("Parent A: {0}", string.Join(", ", individualA.Select(node => node.Id)));
         _logger.LogInformation("Parent B: {0}", string.Join(", ", individualB.Select(node => node.Id)));
 
-        HashSet<GraphNode> individualASet = new HashSet<GraphNode>(individualA);
-        HashSet<GraphNode> individualBSet = new HashSet<GraphNode>(individualB);
+        int middleIndex = individualA.Count / 2;
 
-        // Znalezienie części wspólnej
-        var intersection = individualASet.Intersect(individualBSet).ToList();
-        if (intersection.Count == 0)
+        List<GraphNode> successor = individualA.GetRange(0, middleIndex);
+
+        foreach (var node in individualB)
         {
-            throw new InvalidOperationException("No common elements found for crossover.");
+            if (!successor.Contains(node))
+            {
+                successor.Add(node);
+            }
         }
 
-        GraphNode crossoverPoint = intersection[_random.Next(intersection.Count)];
-        _logger.LogInformation("Crossover point: {0}", crossoverPoint.Id);
+        _logger.LogInformation("\n------ Crossover finished ------\n");
+        _logger.LogInformation("Successor: {0}", string.Join(", ", successor.Select(node => node.Id)));
 
-        int indexA = individualA.IndexOf(crossoverPoint);
-        int indexB = individualB.IndexOf(crossoverPoint);
-
-        List<GraphNode> childA = new List<GraphNode>();
-        List<GraphNode> childB = new List<GraphNode>();
-
-        childA.AddRange(individualA.Take(indexA + 1));
-        childA.AddRange(individualB.Skip(indexB + 1));
-
-        childB.AddRange(individualB.Take(indexB + 1));
-        childB.AddRange(individualA.Skip(indexA + 1));
-
-        _logger.LogInformation("Child A: {0}", string.Join(", ", childA.Select(node => node.Id)));
-        _logger.LogInformation("Child B: {0}", string.Join(", ", childB.Select(node => node.Id)));
-        _logger.LogInformation("\n------Crossover completed------\n");
-
-        return (childA, childB);
+        return successor;
     }
 
 }
