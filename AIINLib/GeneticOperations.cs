@@ -16,6 +16,13 @@ public class GeneticOperations: IGeneticOperations
         _logger = loggerFactory.CreateLogger("GeneticOperations");
     }
     
+    /// <summary>
+    /// Creates random permutations of the parcel-locker graph.
+    /// </summary>
+    /// <param name="parcelLockerGraph">All parcel-locker nodes in the graph.</param>
+    /// <returns>
+    /// Random permutations of parcelLockerGraph argument.
+    /// </returns>
     public List<List<GraphNode>> CreateRandomPopulation(
         List<GraphNode> parcelLockerGraph)
     {
@@ -58,13 +65,13 @@ public class GeneticOperations: IGeneticOperations
     }
 
 
-/// <summary>
-/// Utilizes two-opt as mutation method. Mutates the individual.
-/// </summary>
-/// <param name="individual">Order of parcel lockers to visit</param>
-/// <returns>
-/// Mutated order of parcel lockers to visit.
-/// </returns>
+    /// <summary>
+    /// Utilizes two-opt algorithm as mutation method. Mutates the individual.
+    /// </summary>
+    /// <param name="individual">Order of parcel lockers to visit</param>
+    /// <returns>
+    /// Mutated order of parcel lockers to visit.
+    /// </returns>
     public List<GraphNode> Mutate(List<GraphNode> individual)
     {
         _logger.LogInformation("\n------Mutating started------\n");
