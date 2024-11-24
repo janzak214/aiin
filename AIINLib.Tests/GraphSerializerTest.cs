@@ -8,6 +8,7 @@ namespace AIINLib.Test;
 [TestFixture]
 public class GraphSerializerTest
 {
+    
     [Test]
     public void RoundTrip()
     {
