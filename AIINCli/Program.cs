@@ -102,7 +102,7 @@ internal static class Program
                 ->.parcel_lockers;
 
              way
-                [highway~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|road|residential|track|service|living_street)$"]
+                [highway~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|road|residential|living_street)$"]
                 [access != no]
                 [vehicle != no]
                 [motor_vehicle != no]
