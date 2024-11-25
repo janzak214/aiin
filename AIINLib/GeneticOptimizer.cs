@@ -1,11 +1,17 @@
 using AIINInterfaces;
+using Microsoft.Extensions.Logging;
 
 namespace AIINLib;
 
-public class GeneticOptimizer : IGeneticOptimizer
+public class GeneticOptimizer(
+    IGeneticOperations geneticOperations,
+    ILoggerFactory loggerFactory,
+    Func<GraphNode, GraphNode, double> metric
+)
+    : IGeneticOptimizer
 {
-    private readonly Func<GraphNode, GraphNode, double> metric;
-    private readonly Random random = new();
+    private readonly Random _random = new();
+    private readonly ILogger<GeneticOptimizer> _logger = loggerFactory.CreateLogger<GeneticOptimizer>();
 
     public double CalculateFitness(List<GraphNode> individual)
     {
@@ -26,7 +32,7 @@ public class GeneticOptimizer : IGeneticOptimizer
         double fittestFitness = double.MaxValue;
         for (int i = 0; i < AppConfig.GeneticAlgorithmSettings.TournamentSize; i++)
         {
-            var individual = population[random.Next(0, population.Count)];
+            var individual = population[_random.Next(0, population.Count)];
             var fitness = CalculateFitness(individual);
 
             if (fitness < fittestFitness)
@@ -45,7 +51,7 @@ public class GeneticOptimizer : IGeneticOptimizer
         double worstFitness = double.MinValue;
         for (int i = 0; i < AppConfig.GeneticAlgorithmSettings.TournamentSize; i++)
         {
-            var individualIndex = random.Next(0, population.Count);
+            var individualIndex = _random.Next(0, population.Count);
             var fitness = CalculateFitness(population[individualIndex]);
 
             if (fitness > worstFitness)
@@ -60,6 +66,37 @@ public class GeneticOptimizer : IGeneticOptimizer
 
     public List<List<GraphNode>> Step(List<List<GraphNode>> population)
     {
-        throw new NotImplementedException();
+        var fitness = population.Select(CalculateFitness).ToList();
+        _logger.LogInformation("Average fitness: {AverageFitness}, Best fitness: {MinFitness}",
+            fitness.Average(),
+            fitness.Min()
+        );
+
+        var populationSize = population.Count;
+        List<List<GraphNode>> result = [..population];
+        var mutationCount = (int)Math.Floor(AppConfig.GeneticAlgorithmSettings.MutationRate * populationSize);
+        var crossoverCount = (int)Math.Floor(AppConfig.GeneticAlgorithmSettings.CrossoverRate * populationSize);
+
+        for (var i = 0; i < mutationCount; i++)
+        {
+            var parent = Tournament(population);
+            var mutated = geneticOperations.Mutate(parent);
+            var indexToReplace = NegativeTournament(population);
+            result[indexToReplace] = mutated;
+        }
+
+        for (var i = 0; i < crossoverCount; i++)
+        {
+            var parentA = Tournament(population);
+            var parentB = Tournament(population);
+            var offspring = geneticOperations.Crossover(parentA, parentB);
+            var indexToReplace = NegativeTournament(population);
+            result[indexToReplace] = offspring;
+        }
+
+        return result;
     }
+
+    public static double DefaultMetric(GraphNode nodeA, GraphNode nodeB) =>
+        nodeA.ConnectedNodes.Find(x => x.node.Id == nodeB.Id).weight;
 }
