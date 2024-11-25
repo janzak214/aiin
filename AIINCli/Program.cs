@@ -29,6 +29,7 @@ internal static class Program
             $ AIINCli visualize data-opt.json.gz --original data.json.gz
             $ AIINCli create-parcel-graph data-opt.json.gz parcel-graph.json.gz
             $ AIINCli visualize parcel-graph.json.gz --original data.json.gz
+            $ AIINCli run-optimizer parcel-graph.json.gz
             """);
 
         var bboxOption = new Option<string>(
@@ -74,16 +75,23 @@ internal static class Program
             originalOption
         };
 
+        var runOptimizerCommand = new Command("run-optimizer", "run the TSP optimizer")
+        {
+            inputFileArgument
+        };
+        
         fetchDataCommand.SetHandler(FetchData, bboxOption, outputFileArgument);
         analyzeCommand.SetHandler(Analyze, inputFileArgument, outputFileArgument);
         optimizeCommand.SetHandler(Optimize, inputFileArgument, outputFileArgument);
         createParcelGraphCommand.SetHandler(CreateParcelGraph, inputFileArgument, outputFileArgument);
         visualizeCommand.SetHandler(Visualize, inputFileArgument, originalOption);
+        runOptimizerCommand.SetHandler(RunOptimizer, inputFileArgument);
         rootCommand.AddCommand(fetchDataCommand);
         rootCommand.AddCommand(analyzeCommand);
         rootCommand.AddCommand(optimizeCommand);
         rootCommand.AddCommand(createParcelGraphCommand);
         rootCommand.AddCommand(visualizeCommand);
+        rootCommand.AddCommand(runOptimizerCommand);
 
         return await rootCommand.InvokeAsync(args);
     }
@@ -108,7 +116,6 @@ internal static class Program
                 [motor_vehicle != no]
                 [motor_car != no]
                 [area != yes]
-                [service != emergency_access]
                 ->.roads;
 
              .roads > ->.road_nodes;
@@ -142,7 +149,6 @@ internal static class Program
         var oneWayCount = roads.Count(x => x.OneWay);
         Console.WriteLine($"two-way roads: {roads.Count - oneWayCount}");
         Console.WriteLine($"one-way roads: {oneWayCount}");
-        
         var graph = roadGraphBuilder.CreateRoadGraph(roads, roadNodes, parcelLockers);
 
         using var stream = outFileInfo.Create();
@@ -192,6 +198,16 @@ internal static class Program
 
 
         serializer.Serialize(outStream, parcelGraph.Cast<GraphNode>().ToList());
+    }
+    
+    private static void RunOptimizer(FileInfo inFile)
+    {
+        var serializer = new GraphSerializer();
+        using var stream = inFile.OpenRead();
+        var graph = serializer.Deserialize(stream);
+
+        var runner = new ProgramRunner(graph, LoggerFactory.Create(builder => builder.AddConsole()));
+        runner.Run();
     }
 
     private static void Visualize(FileInfo fileInfo, FileInfo? original)
