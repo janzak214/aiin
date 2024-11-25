@@ -23,31 +23,33 @@ public class ProgramRunner: IProgramRunner
     }
     public void Run()
     {
-        int generationNumer = 0;
+        int generationNumber = 0;
         _logger.LogInformation("----- Starting program -----");
+
         _logger.LogInformation(@"Program parameters:
-            Mutation Rate: {MutationRate}
-            Crossover Rate: {CrossoverRate}
-            Population Size: {PopulationSize}
-            Tournament Size: {TournamentSize}
-            Max Generations: {MaxGenerations}",
+        Mutation Rate: {MutationRate}
+        Crossover Rate: {CrossoverRate}
+        Population Size: {PopulationSize}
+        Tournament Size: {TournamentSize}
+        Max Generations: {MaxGenerations}",
             AppConfig.GeneticAlgorithmSettings.MutationRate,
             AppConfig.GeneticAlgorithmSettings.CrossoverRate,
             AppConfig.GeneticAlgorithmSettings.PopulationSize,
             AppConfig.GeneticAlgorithmSettings.TournamentSize,
             AppConfig.GeneticAlgorithmSettings.MaxGenerations);
 
-        while (AppConfig.GeneticAlgorithmSettings.MaxGenerations > generationNumer + 1)
+        while (generationNumber < AppConfig.GeneticAlgorithmSettings.MaxGenerations)
         {
-            _logger.LogInformation("Creating generation number: {generationNumer}", generationNumer);
-            
+            _logger.LogInformation("Creating generation number: {GenerationNumber}", generationNumber);
+        
             _geneticOptimizer.Step(population: _population);
-            
-            _logger.LogInformation("Generation number {generationNumer} has been created.", generationNumer);
+        
+            _logger.LogInformation("Generation number {GenerationNumber} has been created.", generationNumber);
 
-            generationNumer++;
+            generationNumber++;
         }
-        
-        
+
+        _logger.LogInformation("----- Program execution finished -----");
     }
+
 }
