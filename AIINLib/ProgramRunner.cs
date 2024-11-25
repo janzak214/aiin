@@ -27,16 +27,16 @@ public class ProgramRunner: IProgramRunner
         _logger.LogInformation("----- Starting program -----");
 
         _logger.LogInformation(@"Program parameters:
-        Mutation Rate: {MutationRate}
-        Crossover Rate: {CrossoverRate}
-        Population Size: {PopulationSize}
-        Tournament Size: {TournamentSize}
-        Max Generations: {MaxGenerations}",
-            AppConfig.GeneticAlgorithmSettings.MutationRate,
-            AppConfig.GeneticAlgorithmSettings.CrossoverRate,
-            AppConfig.GeneticAlgorithmSettings.PopulationSize,
-            AppConfig.GeneticAlgorithmSettings.TournamentSize,
-            AppConfig.GeneticAlgorithmSettings.MaxGenerations);
+                                Mutation Rate: {MutationRate}
+                                Crossover Rate: {CrossoverRate}
+                                Population Size: {PopulationSize}
+                                Tournament Size: {TournamentSize}
+                                Max Generations: {MaxGenerations}",
+                                AppConfig.GeneticAlgorithmSettings.MutationRate,
+                                AppConfig.GeneticAlgorithmSettings.CrossoverRate,
+                                AppConfig.GeneticAlgorithmSettings.PopulationSize,
+                                AppConfig.GeneticAlgorithmSettings.TournamentSize,
+                                AppConfig.GeneticAlgorithmSettings.MaxGenerations);
 
         while (generationNumber < AppConfig.GeneticAlgorithmSettings.MaxGenerations)
         {
