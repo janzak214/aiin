@@ -26,7 +26,7 @@ public class GeneticOperations: IGeneticOperations
     public List<List<GraphNode>> CreateRandomPopulation(
         List<GraphNode> parcelLockerGraph)
     {
-        _logger.LogInformation("\n------Creation of random population started------\n");
+        _logger.LogDebug("\n------Creation of random population started------\n");
 
         List<List<GraphNode>> population = new();
         
@@ -38,10 +38,10 @@ public class GeneticOperations: IGeneticOperations
             GrowGraph(individual, parcelLockerGraph);
 
             population.Add(individual);
-            _logger.LogInformation("New individual added to population: {0}", string.Join(", ", individual.Select(node => node.Id)));
+            _logger.LogDebug("New individual added to population: {0}", string.Join(", ", individual.Select(node => node.Id)));
         }
 
-        _logger.LogInformation("\n------Random population creation completed------\n");
+        _logger.LogDebug("\n------Random population creation completed------\n");
         
         return population;
     }
@@ -84,8 +84,8 @@ public class GeneticOperations: IGeneticOperations
             throw new ArgumentException("Argument count must be higher than 1.");
         }
         
-        _logger.LogInformation("\n------Mutating started------\n");
-        _logger.LogInformation("Individual before mutation: {0}", string.Join(", ", individual.Select(node=>node.Id)));
+        _logger.LogDebug("\n------Mutating started------\n");
+        _logger.LogDebug("Individual before mutation: {0}", string.Join(", ", individual.Select(node=>node.Id)));
         
         
         var mutationCandidat = individual.Select(node => node).ToList();
@@ -102,8 +102,8 @@ public class GeneticOperations: IGeneticOperations
         mutationCandidat.ExtensionReverse(firstRandomNodeIndex, secondRandomNodeIndex);
         
         
-        _logger.LogInformation("Individual after mutation: {0}", string.Join(", ", mutationCandidat.Select(node=>node.Id)));
-        _logger.LogInformation("\n------Individual mutated------\n");
+        _logger.LogDebug("Individual after mutation: {0}", string.Join(", ", mutationCandidat.Select(node=>node.Id)));
+        _logger.LogDebug("\n------Individual mutated------\n");
         
         return mutationCandidat;
     }
@@ -123,9 +123,9 @@ public class GeneticOperations: IGeneticOperations
             throw new ArgumentNullException();
         }
         
-        _logger.LogInformation("\n------ Crossover started ------\n");
-        _logger.LogInformation("Parent A: {0}", string.Join(", ", individualA.Select(node => node.Id)));
-        _logger.LogInformation("Parent B: {0}", string.Join(", ", individualB.Select(node => node.Id)));
+        _logger.LogDebug("\n------ Crossover started ------\n");
+        _logger.LogDebug("Parent A: {0}", string.Join(", ", individualA.Select(node => node.Id)));
+        _logger.LogDebug("Parent B: {0}", string.Join(", ", individualB.Select(node => node.Id)));
 
         int middleIndex = individualA.Count / 2;
 
@@ -139,8 +139,8 @@ public class GeneticOperations: IGeneticOperations
             }
         }
 
-        _logger.LogInformation("Successor: {0}", string.Join(", ", successor.Select(node => node.Id)));
-        _logger.LogInformation("\n------ Crossover finished ------\n");
+        _logger.LogDebug("Successor: {0}", string.Join(", ", successor.Select(node => node.Id)));
+        _logger.LogDebug("\n------ Crossover finished ------\n");
 
         return successor;
     }
