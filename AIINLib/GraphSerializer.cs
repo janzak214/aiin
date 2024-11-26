@@ -34,7 +34,8 @@ public class GraphSerializer : IGraphSerializer
             {
                 if (!connections.TryAdd(connectedNode.Id.ToString(), weight))
                 {
-                    Console.WriteLine("warning: duplicate connection - parent: {0}, child: {1}", node.Id, connectedNode.Id);
+                    Console.WriteLine("warning: duplicate connection - parent: {0}, child: {1}", node.Id,
+                        connectedNode.Id);
                 }
             }
 
@@ -95,5 +96,28 @@ public class GraphSerializer : IGraphSerializer
         }
 
         return nodes.Values.ToList();
+    }
+
+    public void SerializePath(Stream stream, List<GraphNode> path)
+    {
+        using GZipStream compressedStream = new(stream, CompressionLevel.SmallestSize);
+        using Utf8JsonWriter writer = new(compressedStream);
+        writer.WriteStartArray();
+        foreach (var node in path)
+        {
+            writer.WriteStringValue(node.Id.ToString());
+        }
+
+        writer.WriteEndArray();
+    }
+
+    public List<GraphNode> DeserializePath(Stream stream, List<GraphNode> graph)
+    {
+        using GZipStream decompressedStream = new(stream, CompressionMode.Decompress);
+        var data = JsonSerializer.Deserialize<List<string>>(decompressedStream, _options)
+                   ?? throw new InvalidOperationException("Failed to parse file");
+
+        var nodes = graph.Select(x => (x.Id, x)).ToDictionary();
+        return data.Select(x => nodes[long.Parse(x)]).ToList();
     }
 }
