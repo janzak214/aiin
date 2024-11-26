@@ -29,7 +29,8 @@ internal static class Program
             $ AIINCli visualize data-opt.json.gz --original data.json.gz
             $ AIINCli create-parcel-graph data-opt.json.gz parcel-graph.json.gz
             $ AIINCli visualize parcel-graph.json.gz --original data.json.gz
-            $ AIINCli run-optimizer parcel-graph.json.gz
+            $ AIINCli run-optimizer parcel-graph.json.gz best.json.gz
+            $ AIINCli visualize data.json.gz --path best.json.gz
             """);
 
         var bboxOption = new Option<string>(
@@ -69,23 +70,31 @@ internal static class Program
             name: "--original",
             description: "Show the original graph for comparison"
         );
+
+        var pathOption = new Option<FileInfo?>(
+            name: "--path",
+            description: "Show a path on the graph"
+        );
+
         var visualizeCommand = new Command("visualize", "Visualize graphs on a map")
         {
             inputFileArgument,
-            originalOption
+            originalOption,
+            pathOption
         };
 
-        var runOptimizerCommand = new Command("run-optimizer", "run the TSP optimizer")
+        var runOptimizerCommand = new Command("run-optimizer", "Run the TSP optimizer and save the best graph cycle")
         {
-            inputFileArgument
+            inputFileArgument,
+            outputFileArgument
         };
-        
+
         fetchDataCommand.SetHandler(FetchData, bboxOption, outputFileArgument);
         analyzeCommand.SetHandler(Analyze, inputFileArgument, outputFileArgument);
         optimizeCommand.SetHandler(Optimize, inputFileArgument, outputFileArgument);
         createParcelGraphCommand.SetHandler(CreateParcelGraph, inputFileArgument, outputFileArgument);
-        visualizeCommand.SetHandler(Visualize, inputFileArgument, originalOption);
-        runOptimizerCommand.SetHandler(RunOptimizer, inputFileArgument);
+        visualizeCommand.SetHandler(Visualize, inputFileArgument, originalOption, pathOption);
+        runOptimizerCommand.SetHandler(RunOptimizer, inputFileArgument, outputFileArgument);
         rootCommand.AddCommand(fetchDataCommand);
         rootCommand.AddCommand(analyzeCommand);
         rootCommand.AddCommand(optimizeCommand);
@@ -199,19 +208,23 @@ internal static class Program
 
         serializer.Serialize(outStream, parcelGraph.Cast<GraphNode>().ToList());
     }
-    
-    private static void RunOptimizer(FileInfo inFile)
+
+    private static void RunOptimizer(FileInfo inFile, FileInfo outFile)
     {
         var serializer = new GraphSerializer();
         using var stream = inFile.OpenRead();
         var graph = serializer.Deserialize(stream);
 
         var runner = new ProgramRunner(graph, LoggerFactory.Create(builder => builder.AddConsole()));
-        runner.Run();
+        var best = runner.Run();
+        using var outStream = outFile.OpenWrite();
+        serializer.SerializePath(outStream, best);
     }
 
-    private static void Visualize(FileInfo fileInfo, FileInfo? original)
+    private static void Visualize(FileInfo fileInfo, FileInfo? original, FileInfo? cycle)
     {
+        var serializer = new GraphSerializer();
+        var parcelLockerGraphBuilder = new ParcelLockerGraphBuilder();
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
@@ -230,6 +243,26 @@ internal static class Program
                 context.Response.Headers.ContentEncoding = "gzip";
                 await Results.File(
                     file.OpenRead(), contentType: "application/json"
+                ).ExecuteAsync(context);
+            }
+            else
+            {
+                await Results.NotFound().ExecuteAsync(context);
+            }
+        });
+        app.MapGet("/path.json", async (context) =>
+        {
+            if (cycle is { } file)
+            {
+                var graph = serializer.Deserialize(fileInfo.OpenRead());
+                var deserializedPath = serializer.DeserializePath(file.OpenRead(), graph);
+                var expanded = parcelLockerGraphBuilder.ExpandPath(deserializedPath, graph);
+                MemoryStream result = new();
+                serializer.SerializePath(result, expanded);
+                context.Response.Headers.ContentEncoding = "gzip";
+
+                await Results.Bytes(
+                    result.GetBuffer(), contentType: "application/json"
                 ).ExecuteAsync(context);
             }
             else

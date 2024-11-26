@@ -22,8 +22,10 @@
 </head>
 <body>
 <div id="map"></div>
-<script>
-    const {MapboxOverlay, ScatterplotLayer, LineLayer} = deck;
+<script type="module">
+    const {MapboxOverlay, ScatterplotLayer, LineLayer, TextLayer, TripsLayer} = deck;
+    import {color} from "https://cdn.jsdelivr.net/npm/d3-color@3/+esm";
+    import * as schemes from "https://cdn.jsdelivr.net/npm/d3-scale-chromatic@3/+esm";
 
     const map = new maplibregl.Map({
         container: "map",
@@ -38,8 +40,8 @@
     function processData(data) {
         const parcelLockers = Object.entries(data).filter(x => x[1].parcelLockerId != null);
         const roads = [];
-        for ([id, node] of Object.entries(data)) {
-            for ([childId, weight] of Object.entries(node.connections)) {
+        for (const [id, node] of Object.entries(data)) {
+            for (const [childId, weight] of Object.entries(node.connections)) {
                 if (childId in data)
                     roads.push([[data[id].longitude, data[id].latitude], [data[childId].longitude, data[childId].latitude]])
             }
@@ -47,19 +49,51 @@
         return {parcelLockers, roads, nodes: data};
     }
 
+    function processCycle(graph, cycle) {
+        const cycleIds = cycle.map(x => +x)
+        const data = graph.nodes;
+        const edges = [];
+        const path = [[data[cycleIds[0]].longitude, data[cycleIds[0]].latitude]];
+        const timestamps = [0];
+        const parcelLockers = [];
+        let order = 0;
+        for (let i = 0; i < cycle.length - 1; i++) {
+            const id = cycleIds[i];
+            const nextId = cycleIds[i + 1]
+            edges.push([i / (cycle.length - 1), [data[id].longitude, data[id].latitude], [data[nextId].longitude, data[nextId].latitude], (i + 1) / (cycle.length - 1)])
+            path.push([data[nextId].longitude, data[nextId].latitude]);
+            timestamps.push((i + 1) / (cycle.length - 1));
+            const node = data[id];
+            if (node.parcelLockerId != null) {
+                parcelLockers.push([order++, node.longitude, node.latitude])
+            }
+        }
+        return {cycleIds, edges, parcelLockers, path, timestamps};
+    }
 
     (async () => {
-        const [graph, original] = await Promise.all([
+        const [graph, original, cycle] = await Promise.all([
             fetch("graph.json").then(x => x.json()),
-            fetch("original.json").then(x => x.json()).catch(() => null)
+            fetch("original.json").then(x => x.json()).catch(() => null),
+            fetch("path.json").then(x => x.json()).catch(() => null),
         ]);
 
         const data = processData(graph);
         const originalData = original == null ? null : processData(original);
-        if (deckOverlay) update(data, originalData);
-        window.data = data;
-        window.originalData = originalData;
-        window.filterNodes = x => update(data, originalData, x);
+        const processedCycle = cycle == null ? null : processCycle(data, cycle);
+        if (deckOverlay) update(data, originalData, processedCycle);
+        window.DATA = {
+            graph,
+            ...data
+        }
+        if (originalData)
+            window.ORIGINAL_DATA = {
+                graph: original,
+                ...originalData
+            }
+
+        if (cycle)
+            window.CYCLE = processedCycle;
     })();
 
     let deckOverlay
@@ -72,7 +106,16 @@
         map.addControl(deckOverlay);
     });
 
-    function update(data, originalData, ids = []) {
+    function offset(t, [x, y]) {
+        const a = 0.00008;
+        const b = 10000;
+        const c = 100;
+        const d = a * Math.sin(b * t) / 2 + a * Math.sin(c * t)
+        const q = a * Math.cos(b * t) / 2 + a * Math.cos(c * t)
+        return [d + x, q + y];
+    }
+
+    function update(data, originalData, cycle, ids = [], time = 0) {
         console.log("updating");
         const filtered = [];
         let bbox = [[Infinity, Infinity], [-Infinity, -Infinity]]
@@ -91,71 +134,126 @@
             padding: {top: 50, bottom: 50, left: 50, right: 50}
         });
         console.log(filtered);
-        deckOverlay.setProps({
-            layers: [
-                new LineLayer({
-                    id: 'original-roads',
-                    data: originalData?.roads,
-                    getColor: [24, 80, 132],
-                    getSourcePosition: d => d[0],
-                    getTargetPosition: d => d[1],
-                    getWidth: 4,
-                    widthUnits: 'meters',
-                    widthMinPixels: 1,
-                    opacity: 0.3,
-                }),
-                new LineLayer({
-                    id: 'roads',
-                    data: data.roads,
-                    getColor: [171, 24, 74],
-                    getSourcePosition: d => d[0],
-                    getTargetPosition: d => d[1],
-                    getWidth: 6,
-                    widthUnits: 'meters',
-                    widthMinPixels: 1,
-                    opacity: 1,
-                }),
-                new ScatterplotLayer({
-                    id: 'parcel-lockers',
-                    data: data.parcelLockers,
-                    getPosition: d => [d[1].longitude, d[1].latitude],
-                    opacity: 0.2,
-                    filled: true,
-                    radiusScale: 1,
-                    getRadius: 20,
-                    radiusUnits: 'meters',
-                    radiusMinPixels: 2,
-                    getFillColor: [239, 188, 138],
-                }),
-                new ScatterplotLayer({
-                    id: 'nodes',
-                    data: filtered,
-                    getPosition: d => [d.longitude, d.latitude],
-                    opacity: 1,
-                    filled: true,
-                    radiusScale: 1,
-                    getRadius: 8,
-                    radiusUnits: 'pixels',
-                    lineWidthUnits: 'pixels',
-                    getFillColor: [255, 128, 255],
-                    getLineColor: [0, 0, 0],
-                    stroked: true,
-                    getLineWidth: 2,
-                }),
-                new ScatterplotLayer({
-                    id: 'parcel-locker-sources',
-                    data: data.parcelLockers,
-                    getPosition: d => [d[1].parcelLockerLongitude, d[1].parcelLockerLatitude],
-                    opacity: 1,
-                    filled: true,
-                    radiusScale: 1,
-                    getRadius: 3,
-                    radiusUnits: 'meters',
-                    radiusMinPixels: 2,
-                    getFillColor: [239, 188, 138],
-                }),
-            ]
-        });
+        const scale = schemes.interpolateCool;
+
+        let start;
+
+        function render(timestamp) {
+            if (start === undefined) {
+                start = timestamp;
+            }
+            const elapsed = timestamp - start;
+            const time = (elapsed / 100000) % 1;
+
+            deckOverlay.setProps({
+                layers: [
+                    new LineLayer({
+                        id: 'original-roads',
+                        data: originalData?.roads,
+                        getColor: [24, 80, 132],
+                        getSourcePosition: d => d[0],
+                        getTargetPosition: d => d[1],
+                        getWidth: 4,
+                        widthUnits: 'meters',
+                        widthMinPixels: 1,
+                        opacity: 0.3,
+                    }),
+                    new LineLayer({
+                        id: 'roads',
+                        data: cycle == null ? data.roads : null,
+                        getColor: [171, 24, 74],
+                        getSourcePosition: d => d[0],
+                        getTargetPosition: d => d[1],
+                        getWidth: 6,
+                        widthUnits: 'meters',
+                        widthMinPixels: 1,
+                        opacity: 1,
+                    }),
+                    new LineLayer({
+                        id: 'cycle',
+                        data: cycle?.edges,
+                        getColor: d => {
+                            const rgb = color(scale(d[0])).rgb();
+                            return [rgb.r, rgb.g, rgb.b]
+                        },
+                        getSourcePosition: d => offset(d[0], d[1]),
+                        getTargetPosition: d => offset(d[3], d[2]),
+                        getWidth: 8,
+                        widthUnits: 'meters',
+                        widthMinPixels: 2,
+                        widthMaxPixels: 4,
+                        opacity: 0.5,
+                    }),
+                    new ScatterplotLayer({
+                        id: 'parcel-lockers',
+                        data: data.parcelLockers,
+                        getPosition: d => [d[1].longitude, d[1].latitude],
+                        opacity: 0.2,
+                        filled: true,
+                        radiusScale: 1,
+                        getRadius: 20,
+                        radiusUnits: 'meters',
+                        radiusMinPixels: 2,
+                        getFillColor: [239, 188, 138],
+                    }),
+                    new ScatterplotLayer({
+                        id: 'nodes',
+                        data: filtered,
+                        getPosition: d => [d.longitude, d.latitude],
+                        opacity: 1,
+                        filled: true,
+                        radiusScale: 1,
+                        getRadius: 8,
+                        radiusUnits: 'pixels',
+                        lineWidthUnits: 'pixels',
+                        getFillColor: [255, 128, 255],
+                        getLineColor: [0, 0, 0],
+                        stroked: true,
+                        getLineWidth: 2,
+                    }),
+                    new ScatterplotLayer({
+                        id: 'parcel-locker-sources',
+                        data: data.parcelLockers,
+                        getPosition: d => [d[1].parcelLockerLongitude, d[1].parcelLockerLatitude],
+                        opacity: 1,
+                        filled: true,
+                        radiusScale: 1,
+                        getRadius: 3,
+                        radiusUnits: 'meters',
+                        radiusMinPixels: 2,
+                        getFillColor: [239, 188, 138],
+                    }),
+                    new TextLayer({
+                        id: 'parcel-locker-order',
+                        data: cycle?.parcelLockers,
+                        getPosition: d => [d[1], d[2]],
+                        getText: d => d[0].toString(),
+                        getColor: [0, 0, 0],
+                        sizeUnits: 'meters',
+                        getSize: 20,
+                    }),
+                    new TripsLayer({
+                        id: 'trips-layer',
+                        data: cycle == null ? null : [[cycle.path, cycle.timestamps]],
+                        getPath: d => d[0],
+                        getTimestamps: d => d[1],
+                        getColor: [255, 0, 0],
+                        trailLength: 0.02,
+                        getWidth: 4,
+                        widthMinPixels: 4,
+                        widthMaxPixels: 8,
+                        currentTime: time,
+                        opacity: 0.5,
+                        capRounded: true,
+                        jointRounded: true,
+                    })
+                ]
+            });
+
+            requestAnimationFrame(render);
+        }
+
+        requestAnimationFrame(render);
     }
 </script>
 </body>
