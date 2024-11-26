@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIINInterfaces", "AIINInter
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIINLib.Tests", "AIINLib.Tests\AIINLib.Tests.csproj", "{6B527556-5968-45E0-9B41-FEAC7854354F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIINLib.Benchmarks", "AIINLib.Benchmarks\AIINLib.Benchmarks.csproj", "{9B715D74-5E5B-4936-BDDF-7B3B3E97DD0A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -36,5 +38,9 @@ Global
 		{6B527556-5968-45E0-9B41-FEAC7854354F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6B527556-5968-45E0-9B41-FEAC7854354F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6B527556-5968-45E0-9B41-FEAC7854354F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9B715D74-5E5B-4936-BDDF-7B3B3E97DD0A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9B715D74-5E5B-4936-BDDF-7B3B3E97DD0A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9B715D74-5E5B-4936-BDDF-7B3B3E97DD0A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9B715D74-5E5B-4936-BDDF-7B3B3E97DD0A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
