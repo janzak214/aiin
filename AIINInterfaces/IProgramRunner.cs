@@ -2,5 +2,5 @@
 
 public interface IProgramRunner
 {
-    void Run();
+    List<GraphNode> Run();
 }

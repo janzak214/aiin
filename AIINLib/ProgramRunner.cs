@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AIINLib;
 
-public class ProgramRunner: IProgramRunner
+public class ProgramRunner : IProgramRunner
 {
     private readonly List<GraphNode> _parcelLockerGraph;
     private List<List<GraphNode>> _population;
@@ -21,7 +21,8 @@ public class ProgramRunner: IProgramRunner
         _geneticOptimizer = new GeneticOptimizer(_geneticOperations, loggerFactory, GeneticOptimizer.DefaultMetric);
         _logger = loggerFactory.CreateLogger<ProgramRunner>();
     }
-    public void Run()
+
+    public List<GraphNode> Run()
     {
         int generationNumber = 0;
         _logger.LogInformation("----- Starting program -----");
@@ -32,11 +33,11 @@ public class ProgramRunner: IProgramRunner
                                 Population Size: {PopulationSize}
                                 Tournament Size: {TournamentSize}
                                 Max Generations: {MaxGenerations}",
-                                AppConfig.GeneticAlgorithmSettings.MutationRate,
-                                AppConfig.GeneticAlgorithmSettings.CrossoverRate,
-                                AppConfig.GeneticAlgorithmSettings.PopulationSize,
-                                AppConfig.GeneticAlgorithmSettings.TournamentSize,
-                                AppConfig.GeneticAlgorithmSettings.MaxGenerations);
+            AppConfig.GeneticAlgorithmSettings.MutationRate,
+            AppConfig.GeneticAlgorithmSettings.CrossoverRate,
+            AppConfig.GeneticAlgorithmSettings.PopulationSize,
+            AppConfig.GeneticAlgorithmSettings.TournamentSize,
+            AppConfig.GeneticAlgorithmSettings.MaxGenerations);
 
         while (generationNumber < AppConfig.GeneticAlgorithmSettings.MaxGenerations)
         {
@@ -48,7 +49,10 @@ public class ProgramRunner: IProgramRunner
 
             generationNumber++;
         }
-
         _logger.LogInformation("----- Program execution finished -----");
+
+        var best = _population.MinBy(x => _geneticOptimizer.CalculateFitness(x)) ??
+                   throw new InvalidOperationException("No fittest individual found.");
+        return best;
     }
 }
