@@ -18,7 +18,7 @@ public class ProgramRunner : IProgramRunner
 
         _geneticOperations = new GeneticOperations(AppConfig.GeneticAlgorithmSettings.PopulationSize, loggerFactory);
         _population = _geneticOperations.CreateRandomPopulation(_parcelLockerGraph);
-        _geneticOptimizer = new GeneticOptimizer(_geneticOperations, loggerFactory, GeneticOptimizer.DefaultMetric);
+        _geneticOptimizer = new GeneticOptimizer(_geneticOperations, loggerFactory, parcelLockerGraph);
         _logger = loggerFactory.CreateLogger<ProgramRunner>();
     }
 

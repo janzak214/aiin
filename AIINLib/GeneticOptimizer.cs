@@ -3,15 +3,25 @@ using Microsoft.Extensions.Logging;
 
 namespace AIINLib;
 
-public class GeneticOptimizer(
-    IGeneticOperations geneticOperations,
-    ILoggerFactory loggerFactory,
-    Func<GraphNode, GraphNode, double> metric
-)
-    : IGeneticOptimizer
+public class GeneticOptimizer : IGeneticOptimizer
 {
     private readonly Random _random = new();
-    private readonly ILogger<GeneticOptimizer> _logger = loggerFactory.CreateLogger<GeneticOptimizer>();
+    private readonly ILogger<GeneticOptimizer> _logger;
+    private readonly Dictionary<long, Dictionary<long, double>> _connections;
+    private readonly IGeneticOperations _geneticOperations;
+
+    public GeneticOptimizer(
+        IGeneticOperations geneticOperations,
+        ILoggerFactory loggerFactory,
+        List<GraphNode> graph
+    )
+    {
+        _geneticOperations = geneticOperations;
+        _logger = loggerFactory.CreateLogger<GeneticOptimizer>();
+        _connections = graph
+            .Select(node => (node.Id, node.ConnectedNodes.Select(x => (x.node.Id, x.weight)).ToDictionary()))
+            .ToDictionary();
+    }
 
     public double CalculateFitness(List<GraphNode> individual)
     {
@@ -19,45 +29,45 @@ public class GeneticOptimizer(
         double fitness = 0;
         for (int i = 1; i < individual.Count; i++)
         {
-            fitness += metric(previousNode, individual[i]);
+            fitness += Metric(previousNode, individual[i]);
             previousNode = individual[i];
         }
 
         return fitness;
     }
 
-    public List<GraphNode> Tournament(List<List<GraphNode>> population)
+    public List<GraphNode> Tournament(List<List<GraphNode>> population, List<double> fitness)
     {
         List<GraphNode>? fittestIndividual = null;
         double fittestFitness = double.MaxValue;
         for (int i = 0; i < AppConfig.GeneticAlgorithmSettings.TournamentSize; i++)
         {
-            var individual = population[_random.Next(0, population.Count)];
-            var fitness = CalculateFitness(individual);
+            var individualIndex = _random.Next(0, population.Count);
+            var currentFitness = fitness[individualIndex];
 
-            if (fitness < fittestFitness)
+            if (currentFitness < fittestFitness)
             {
-                fittestIndividual = individual;
-                fittestFitness = fitness;
+                fittestIndividual = population[individualIndex];
+                fittestFitness = currentFitness;
             }
         }
 
         return fittestIndividual ?? throw new InvalidOperationException("No fittest individual found.");
     }
 
-    public int NegativeTournament(List<List<GraphNode>> population)
+    public int NegativeTournament(List<List<GraphNode>> population, List<double> fitness)
     {
         int? worstIndividualIndex = null;
         double worstFitness = double.MinValue;
         for (int i = 0; i < AppConfig.GeneticAlgorithmSettings.TournamentSize; i++)
         {
             var individualIndex = _random.Next(0, population.Count);
-            var fitness = CalculateFitness(population[individualIndex]);
+            var currentFitness = fitness[individualIndex];
 
-            if (fitness > worstFitness)
+            if (currentFitness > worstFitness)
             {
                 worstIndividualIndex = individualIndex;
-                worstFitness = fitness;
+                worstFitness = currentFitness;
             }
         }
 
@@ -66,37 +76,48 @@ public class GeneticOptimizer(
 
     public List<List<GraphNode>> Step(List<List<GraphNode>> population)
     {
-        var fitness = population.Select(CalculateFitness).ToList();
+        var fitness = population.AsParallel().Select(CalculateFitness).ToList();
         _logger.LogInformation("Average fitness: {AverageFitness}, Best fitness: {MinFitness}",
             fitness.Average(),
             fitness.Min()
         );
 
         var populationSize = population.Count;
-        List<List<GraphNode>> result = [..population];
         var mutationCount = (int)Math.Floor(AppConfig.GeneticAlgorithmSettings.MutationRate * populationSize);
         var crossoverCount = (int)Math.Floor(AppConfig.GeneticAlgorithmSettings.CrossoverRate * populationSize);
+        var order = population.Select(_ => 2).ToList();
 
-        for (var i = 0; i < mutationCount; i++)
+        for (var i = 0; i < mutationCount + crossoverCount; i++)
         {
-            var parent = Tournament(population);
-            var mutated = geneticOperations.Mutate(parent);
-            var indexToReplace = NegativeTournament(population);
-            result[indexToReplace] = mutated;
+            var indexToReplace = NegativeTournament(population, fitness);
+            order[indexToReplace] = i < mutationCount ? 0 : 1;
         }
 
-        for (var i = 0; i < crossoverCount; i++)
-        {
-            var parentA = Tournament(population);
-            var parentB = Tournament(population);
-            var offspring = geneticOperations.Crossover(parentA, parentB);
-            var indexToReplace = NegativeTournament(population);
-            result[indexToReplace] = offspring;
-        }
+        var sorted =
+            population.Select((individual, index) => (individual, index))
+                .OrderBy(x => order[x.index])
+                .Select(x => x.individual)
+                .ToList();
 
-        return result;
+        return sorted.AsParallel().Select((individual, index) =>
+        {
+            if (index < mutationCount)
+            {
+                var parent = Tournament(population, fitness);
+                return _geneticOperations.Mutate(parent);
+            }
+            else if (index < mutationCount + crossoverCount)
+            {
+                var parentA = Tournament(population, fitness);
+                var parentB = Tournament(population, fitness);
+                return _geneticOperations.Crossover(parentA, parentB);
+            }
+            else
+            {
+                return individual;
+            }
+        }).ToList();
     }
 
-    public static double DefaultMetric(GraphNode nodeA, GraphNode nodeB) =>
-        nodeA.ConnectedNodes.Find(x => x.node.Id == nodeB.Id).weight;
+    private double Metric(GraphNode nodeA, GraphNode nodeB) => _connections[nodeA.Id][nodeB.Id];
 }

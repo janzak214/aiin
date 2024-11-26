@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using AIINInterfaces;
-using BenchmarkDotNet;
 using BenchmarkDotNet.Attributes;
 using Geo;
 using Microsoft.Extensions.Logging;
@@ -25,7 +24,7 @@ namespace AIINLib.Benchmarks
                 LoggerFactory.Create(_ => { }));
             _graph = CreateRandomGraph(300);
             _geneticOptimizer = new GeneticOptimizer(_geneticOperations, LoggerFactory.Create(
-                _ => { }), GeneticOptimizer.DefaultMetric);
+                _ => { }), _graph);
         }
 
         static List<GraphNode> CreateRandomGraph(int size)
@@ -59,10 +58,10 @@ namespace AIINLib.Benchmarks
 
         [Benchmark]
         public List<GraphNode> Mutation() => _geneticOperations.Mutate(_population[0]);
-        
+
         [Benchmark]
         public List<GraphNode> Crossover() => _geneticOperations.Crossover(_population[0], _population[1]);
-        
+
         [Benchmark]
         public List<List<GraphNode>> Step() => _geneticOptimizer.Step(_population);
 
