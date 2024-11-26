@@ -29,8 +29,10 @@ jobs:
       - name: Test
         run: dotnet test -c Release  --no-build --verbosity normal
       - name: Benchmark
+        if: github.event_name == 'pull_request'
         run: dotnet run --project AIINLib.Benchmarks -c Release
       - name: Comment PR
         uses: thollander/actions-comment-pull-request@v3
+        if: github.event_name == 'pull_request'
         with:
           file-path: BenchmarkDotNet.Artifacts/results/AIINLib.Benchmarks.Benchmarks-report-github.md
