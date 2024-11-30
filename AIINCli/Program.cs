@@ -256,7 +256,10 @@ internal static class Program
             {
                 var graph = serializer.Deserialize(fileInfo.OpenRead());
                 var deserializedPath = serializer.DeserializePath(file.OpenRead(), graph);
-                var expanded = parcelLockerGraphBuilder.ExpandPath(deserializedPath, graph);
+                var (_, minNodeIndex) = deserializedPath.Select((node, i) => (node, i)).MinBy(x => x.node.Id);
+                var orderedPath = deserializedPath.Skip(minNodeIndex).Concat(deserializedPath.Take(minNodeIndex))
+                    .ToList();
+                var expanded = parcelLockerGraphBuilder.ExpandPath(orderedPath, graph);
                 MemoryStream result = new();
                 serializer.SerializePath(result, expanded);
                 context.Response.Headers.ContentEncoding = "gzip";
