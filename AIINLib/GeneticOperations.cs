@@ -74,20 +74,12 @@ public class GeneticOperations: IGeneticOperations
     /// </returns>
     public List<GraphNode> Mutate(List<GraphNode> individual)
     {
-        if (individual == null)
+        if (_logger.IsEnabled(LogLevel.Debug))
         {
-            throw new ArgumentNullException(nameof(individual));
+            _logger.LogDebug("\n------Mutating started------\n");
+            _logger.LogDebug("Individual before mutation: {0}", string.Join(", ", individual.Select(node => node.Id)));
         }
 
-        if (individual.Count <=1)
-        {
-            throw new ArgumentException("Argument count must be higher than 1.");
-        }
-        
-        _logger.LogDebug("\n------Mutating started------\n");
-        _logger.LogDebug("Individual before mutation: {0}", string.Join(", ", individual.Select(node=>node.Id)));
-        
-        
         var mutationCandidat = individual.Select(node => node).ToList();
         
         int firstRandomNodeIndex = _random.Next(mutationCandidat.Count());
@@ -100,11 +92,14 @@ public class GeneticOperations: IGeneticOperations
         while(secondRandomNodeIndex == firstRandomNodeIndex);
         
         mutationCandidat.ExtensionReverse(firstRandomNodeIndex, secondRandomNodeIndex);
-        
-        
-        _logger.LogDebug("Individual after mutation: {0}", string.Join(", ", mutationCandidat.Select(node=>node.Id)));
-        _logger.LogDebug("\n------Individual mutated------\n");
-        
+
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug("Individual after mutation: {0}",
+                string.Join(", ", mutationCandidat.Select(node => node.Id)));
+            _logger.LogDebug("\n------Individual mutated------\n");
+        }
+
         return mutationCandidat;
     }
 
@@ -118,29 +113,32 @@ public class GeneticOperations: IGeneticOperations
     /// <returns>A new individual (list of GraphNodes) created through crossover.</returns>
     public List<GraphNode> Crossover(List<GraphNode> individualA, List<GraphNode> individualB)
     {
-        if (individualA == null || individualB == null)
+        if (_logger.IsEnabled(LogLevel.Debug))
         {
-            throw new ArgumentNullException();
+            _logger.LogDebug("\n------ Crossover started ------\n");
+            _logger.LogDebug("Parent A: {0}", string.Join(", ", individualA.Select(node => node.Id)));
+            _logger.LogDebug("Parent B: {0}", string.Join(", ", individualB.Select(node => node.Id)));
         }
-        
-        _logger.LogDebug("\n------ Crossover started ------\n");
-        _logger.LogDebug("Parent A: {0}", string.Join(", ", individualA.Select(node => node.Id)));
-        _logger.LogDebug("Parent B: {0}", string.Join(", ", individualB.Select(node => node.Id)));
 
         int middleIndex = individualA.Count / 2;
 
         List<GraphNode> successor = individualA.GetRange(0, middleIndex);
-
+        HashSet<long> successorIds = successor.Select(x => x.Id).ToHashSet();
+        
         foreach (var node in individualB)
         {
-            if (!successor.Select(x=> x.Id).Contains(node.Id))
+            if (!successorIds.Contains(node.Id))
             {
+                successorIds.Add(node.Id);
                 successor.Add(node);
             }
         }
 
-        _logger.LogDebug("Successor: {0}", string.Join(", ", successor.Select(node => node.Id)));
-        _logger.LogDebug("\n------ Crossover finished ------\n");
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug("Successor: {0}", string.Join(", ", successor.Select(node => node.Id)));
+            _logger.LogDebug("\n------ Crossover finished ------\n");
+        }
 
         return successor;
     }
