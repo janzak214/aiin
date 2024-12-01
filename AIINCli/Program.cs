@@ -1,6 +1,8 @@
 ﻿using System.CommandLine;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using AIINInterfaces;
 using AIINLib;
 using Microsoft.AspNetCore.Builder;
@@ -9,6 +11,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OsmSharp.Streams;
+using ScottPlot;
+using ScottPlot.TickGenerators;
+using Serilog;
+using Serilog.Formatting.Json;
+using SkiaSharp;
 
 namespace AIINCli;
 
@@ -29,8 +36,8 @@ internal static class Program
             $ AIINCli visualize data-opt.json.gz --original data.json.gz
             $ AIINCli create-parcel-graph data-opt.json.gz parcel-graph.json.gz
             $ AIINCli visualize parcel-graph.json.gz --original data.json.gz
-            $ AIINCli run-optimizer parcel-graph.json.gz best.json.gz
-            $ AIINCli visualize data.json.gz --path best.json.gz
+            $ AIINCli run-optimizer parcel-graph.json.gz test-run
+            $ AIINCli visualize data.json.gz --path Runs/test-run/path.json.gz
             """);
 
         var bboxOption = new Option<string>(
@@ -83,10 +90,12 @@ internal static class Program
             pathOption
         };
 
+        var runNameArgument = new Argument<string>("Run name");
+
         var runOptimizerCommand = new Command("run-optimizer", "Run the TSP optimizer and save the best graph cycle")
         {
             inputFileArgument,
-            outputFileArgument
+            runNameArgument,
         };
 
         fetchDataCommand.SetHandler(FetchData, bboxOption, outputFileArgument);
@@ -94,7 +103,7 @@ internal static class Program
         optimizeCommand.SetHandler(Optimize, inputFileArgument, outputFileArgument);
         createParcelGraphCommand.SetHandler(CreateParcelGraph, inputFileArgument, outputFileArgument);
         visualizeCommand.SetHandler(Visualize, inputFileArgument, originalOption, pathOption);
-        runOptimizerCommand.SetHandler(RunOptimizer, inputFileArgument, outputFileArgument);
+        runOptimizerCommand.SetHandler(RunOptimizer, inputFileArgument, runNameArgument);
         rootCommand.AddCommand(fetchDataCommand);
         rootCommand.AddCommand(analyzeCommand);
         rootCommand.AddCommand(optimizeCommand);
@@ -209,16 +218,76 @@ internal static class Program
         serializer.Serialize(outStream, parcelGraph.Cast<GraphNode>().ToList());
     }
 
-    private static void RunOptimizer(FileInfo inFile, FileInfo outFile)
+    private static void RunOptimizer(FileInfo inFile, string runName)
     {
+        var directoryPath = Path.Join("Runs", runName);
+        if (Directory.Exists(directoryPath))
+            Directory.Delete(directoryPath, recursive: true);
+        var directory = Directory.CreateDirectory(directoryPath);
         var serializer = new GraphSerializer();
         using var stream = inFile.OpenRead();
         var graph = serializer.Deserialize(stream);
 
-        var runner = new ProgramRunner(graph, LoggerFactory.Create(builder => builder.AddConsole()));
+        Log.Logger = new LoggerConfiguration()
+            .Enrich.FromLogContext()
+            .WriteTo.File(new JsonFormatter(), Path.Join(directory.FullName, "logs.json"))
+            .CreateLogger();
+
+        var runner = new ProgramRunner(graph, LoggerFactory.Create(builder =>
+        {
+            builder.AddConsole();
+            builder.AddSerilog(dispose: true);
+        }));
         var best = runner.Run();
-        using var outStream = outFile.OpenWrite();
+        Log.CloseAndFlush();
+
+        using var outStream = File.OpenWrite(Path.Join(directory.FullName, "path.json.gz"));
         serializer.SerializePath(outStream, best);
+
+        Plot(runName, directoryPath);
+    }
+
+    private static void Plot(string name, string path)
+    {
+        List<double> minFitnessValues = [];
+        List<double> averageFitnessValues = [];
+
+        foreach (var line in File.ReadLines(Path.Join(path, "logs.json")))
+        {
+            var obj = JsonSerializer.Deserialize<JsonNode>(line)!;
+
+            if ((obj["Properties"]?["AverageFitness"]?.GetValue<double?>() is { } averageFitness)
+                && (obj["Properties"]?["MinFitness"]?.GetValue<double?>() is { } minFitness))
+            {
+                minFitnessValues.Add(minFitness);
+                averageFitnessValues.Add(averageFitness);
+            }
+        }
+
+        var plot = new Plot();
+        var signal1 = plot.Add.Signal(minFitnessValues.Select(Math.Log10).ToArray());
+        signal1.LegendText = "Minimum";
+        var signal2 = plot.Add.Signal(averageFitnessValues.Select(Math.Log10).ToArray());
+        signal2.LegendText = "Average";
+        plot.ShowLegend(Alignment.UpperRight);
+        plot.XLabel("Generation");
+        plot.YLabel("Fitness");
+        plot.Title($"{name} – best individual: {minFitnessValues.Last()}");
+
+
+        var tickGen = new NumericManual(ticks: Enumerable.Range(0, 20)
+            .Concat(Enumerable.Range(20, 40).Where(x => x % 2 == 0))
+            .Select(x => x % 2 == 0
+                ? Tick.Major(Math.Log10(x * 100000), (x * 100000).ToString())
+                : Tick.Minor(Math.Log10(x * 100000))).ToArray());
+
+        plot.Axes.Left.TickGenerator = tickGen;
+        plot.Grid.MajorLineColor = Colors.Black.WithOpacity(.15);
+        plot.Grid.MinorLineColor = Colors.Black.WithOpacity(.05);
+        plot.Grid.MinorLineWidth = 1;
+
+
+        plot.SavePng(Path.Join(path, "plot.png"), width: 640, height: 480);
     }
 
     private static void Visualize(FileInfo fileInfo, FileInfo? original, FileInfo? cycle)
