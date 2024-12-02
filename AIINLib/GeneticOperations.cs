@@ -9,6 +9,12 @@ public class GeneticOperations: IGeneticOperations
     private Random _random;
     private readonly ILogger _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GeneticOperations"/> class.
+    /// </summary>
+    /// <param name="populationSize">The size of the population to be created and operated on by the genetic algorithm.</param>
+    /// <param name="loggerFactory">The <see cref="ILoggerFactory"/> used to create a logger for the <see cref="GeneticOperations"/> class.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="loggerFactory"/> is <c>null</c>.</exception>
     public GeneticOperations(int populationSize, ILoggerFactory loggerFactory)
     {
         _populationSize = populationSize;
