@@ -11,6 +11,12 @@ public class ProgramRunner : IProgramRunner
     private IGeneticOptimizer _geneticOptimizer { get; }
     private ILogger<ProgramRunner> _logger { get; }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ProgramRunner"/> class.
+    /// </summary>
+    /// <param name="parcelLockerGraph">A list of <see cref="GraphNode"/> objects representing the parcel locker graph to optimize.</param>
+    /// <param name="loggerFactory">The <see cref="ILoggerFactory"/> used to create the logger.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="parcelLockerGraph"/> or <paramref name="loggerFactory"/> is <c>null</c>.</exception>
     public ProgramRunner(List<GraphNode> parcelLockerGraph, ILoggerFactory loggerFactory)
     {
         _parcelLockerGraph = parcelLockerGraph ?? throw new ArgumentNullException(nameof(parcelLockerGraph));
