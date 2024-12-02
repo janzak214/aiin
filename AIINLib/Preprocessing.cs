@@ -7,6 +7,19 @@ namespace AIINLib;
 
 public static class Preprocessing
 {
+    
+    /// <summary>
+    /// Splits a collection of <see cref="OsmGeo"/> items into separate lists of parcel lockers, road nodes, and roads.
+    /// </summary>
+    /// <param name="items">The collection of <see cref="OsmGeo"/> items to split.</param>
+    /// <returns>
+    /// A tuple containing three lists:
+    /// <list type="bullet">
+    ///     <item><description><c>parcelLockers</c>: A list of nodes representing parcel lockers.</description></item>
+    ///     <item><description><c>roadNodes</c>: A list of nodes representing road nodes.</description></item>
+    ///     <item><description><c>roads</c>: A list of roads.</description></item>
+    /// </list>
+    /// </returns>
     public static
         (List<Node> parcelLockers, List<Node> roadNodes, List<Road> roads)
         SplitByType(IEnumerable<OsmGeo> items)

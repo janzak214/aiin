@@ -10,6 +10,12 @@ public class GeneticOptimizer : IGeneticOptimizer
     private readonly Dictionary<long, Dictionary<long, double>> _connections;
     private readonly IGeneticOperations _geneticOperations;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GeneticOptimizer"/> class.
+    /// </summary>
+    /// <param name="geneticOperations">The genetic operations to be used for mutation and crossover.</param>
+    /// <param name="loggerFactory">A logger factory to create a logger instance.</param>
+    /// <param name="graph">A graph representing the road network.</param>
     public GeneticOptimizer(
         IGeneticOperations geneticOperations,
         ILoggerFactory loggerFactory,
